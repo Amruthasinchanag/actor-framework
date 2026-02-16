@@ -31,16 +31,76 @@ jobs:
   run-via-tests:
     name: Run VI Analyzer tests
     runs-on: ubuntu-latest
-    container:
-      image: nationalinstruments/labview:2025q3patch1-linux
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history
+
+      - name: Determine config file path
+        id: config-path
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "path=.github/via-config.viancfg" >> $GITHUB_OUTPUT
+          else
+            echo "path=generated-config.viancfg" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate VI Analyzer Config
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/generate_viancfg
+        with:
+          template-path: '.github/actions/generate_viancfg/via_template_linux.viancfg'
+          output-path: 'generated-config.viancfg'
+          base-branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
+
+      - name: Validate if config file exists
+        id: check-config
+        run: |
+          CONFIG_FILE="${{ steps.config-path.outputs.path }}"
+    
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "Using config: $CONFIG_FILE"
+            echo "config_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Error: Config file not found at $CONFIG_FILE"
+            echo "config_exists=false" >> $GITHUB_OUTPUT
+            
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+              echo "Manual trigger requires .github/via-config.viancfg to exist"
+              exit 1
+            else
+              echo "No LabVIEW files changed; skipping VI Analyzer tests."
+            fi
+          fi
+
+      - name: Pull Docker Image
+        if: steps.check-config.outputs.config_exists == 'true'
+        run: docker pull nationalinstruments/labview:2025q3patch1-linux
 
       - name: Run VI Analyzer tests
-        shell: bash
-        working-directory: ${{ github.workspace }}
+        if: steps.check-config.outputs.config_exists == 'true'
+        env:
+          CONFIG_PATH: ${{ steps.config-path.outputs.path }}
         run: |
-          # TODO: Add commands to run VI Analyzer tests on files in this repo
-          echo "Work In progress: VI Analyzer tests to be implemented."
+          set +e  # Disable exit on error temporarily
+
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            nationalinstruments/labview:2025q3patch1-linux \
+            bash -c "cd /workspace && chmod +x .github/scripts/run-via.sh && ./.github/scripts/run-via.sh '$CONFIG_PATH'"
+
+          VIA_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+    
+          chmod +x .github/scripts/parse-via-report.sh
+          ./.github/scripts/parse-via-report.sh "$VIA_EXIT_CODE"
+
+      - name: Upload VI Analyzer Report
+        uses: actions/upload-artifact@v4
+        if: always()  # Upload even if tests fail
+        with:
+          name: vi-analyzer-report
+          path: vi-analyzer-report.htm
+          retention-days: 7
