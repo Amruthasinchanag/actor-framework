@@ -1,0 +1,51 @@
+name: 'Run VI Analyzer with LabVIEW Container'
+description: 'Execute LabVIEW VI Analyzer tests using Docker container and parse results'
+
+inputs:
+  config-path:
+    description: 'Path to VI Analyzer configuration file (.viancfg) or LabVIEW files (.vi, .ctl, .llb)'
+    required: true
+  labview-version:
+    description: 'LabVIEW Docker image version tag'
+    required: false
+    default: '2026q1-linux'
+  docker-image:
+    description: 'Full Docker image name'
+    required: false
+    default: 'nationalinstruments/labview'
+
+outputs:
+  via-exit-code:
+    description: 'VI Analyzer exit code (0 = success, non-zero = failures/errors)'
+    value: ${{ steps.run-via.outputs.exit-code }}
+  report-path:
+    description: 'Path to generated HTML report'
+    value: 'vi-analyzer-report.htm'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Pull LabVIEW Docker Image
+      shell: bash
+      run: docker pull ${{ inputs.docker-image }}:${{ inputs.labview-version }}
+
+    - name: Run VI Analyzer in Container
+      id: run-via
+      shell: bash
+      run: |
+        set +e  # Don't exit on VIA failure
+        
+        docker run --rm \
+          -v "${{ github.workspace }}:/workspace" \
+          ${{ inputs.docker-image }}:${{ inputs.labview-version }} \
+          bash -c "cd /workspace && chmod +x ${{ github.action_path }}/run-via.sh && ${{ github.action_path }}/run-via.sh '${{ inputs.config-path }}'"
+        
+        VIA_EXIT_CODE=$?
+        echo "exit-code=$VIA_EXIT_CODE" >> $GITHUB_OUTPUT
+        set -e
+
+    - name: Parse VI Analyzer Report
+      shell: bash
+      run: |
+        chmod +x .github/scripts/parse-via-report.sh
+        ./.github/scripts/parse-via-report.sh "${{ steps.run-via.outputs.exit-code }}"

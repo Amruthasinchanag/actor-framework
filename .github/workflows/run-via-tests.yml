@@ -75,31 +75,16 @@ jobs:
             fi
           fi
 
-      - name: Pull Docker Image
-        if: steps.check-config.outputs.config_exists == 'true'
-        run: docker pull nationalinstruments/labview:2026q1-linux
-
       - name: Run VI Analyzer tests
         if: steps.check-config.outputs.config_exists == 'true'
-        env:
-          CONFIG_PATH: ${{ steps.config-path.outputs.path }}
-        run: |
-          set +e  # Disable exit on error temporarily
-
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
-            nationalinstruments/labview:2026q1-linux \
-            bash -c "cd /workspace && chmod +x .github/scripts/run-via.sh && ./.github/scripts/run-via.sh '$CONFIG_PATH'"
-
-          VIA_EXIT_CODE=$?
-          set -e  # Re-enable exit on error
-    
-          chmod +x .github/scripts/parse-via-report.sh
-          ./.github/scripts/parse-via-report.sh "$VIA_EXIT_CODE"
+        uses: ./.github/actions/run-lv-docker
+        with:
+          config-path: ${{ steps.config-path.outputs.path }}
+          labview-version: '2026q1-linux'
 
       - name: Upload VI Analyzer Report
         uses: actions/upload-artifact@v4
-        if: always()  # Upload even if tests fail
+        if: always() && steps.check-config.outputs.config_exists == 'true'  # Upload even if tests fail
         with:
           name: vi-analyzer-report
           path: vi-analyzer-report.htm
