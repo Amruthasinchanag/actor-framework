@@ -121,12 +121,22 @@ if [ "$TEST_ERROR_OUT" -gt 0 ]; then
     echo "=================================================="
 
     awk '
-        /<h3>Test Error Out<\/h3>/,/<\/table>/ {
-        if (match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
-            test_name = arr[1]
-            error_msg = arr[2]
-            printf "\n %s\n   → %s\n", test_name, error_msg
-        }
+        /<h3>Test Error Out<\/h3>/,/<h3>|<\/body>/ {
+            # Detect subsection headers
+            if (match($0, /<br><b>([^<]+)<\/b>/, arr)) {
+                if (current_test != "") print ""
+                current_test = arr[1]
+                printf "\n[%s]\n", current_test
+                next
+            }
+            # Extract error rows
+            if (match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
+                vi_name = arr[1]
+                vi_path = arr[2]
+                error_msg = arr[3]
+                printf "  %s\n", vi_name
+                printf "    → %s\n", error_msg
+            }
         }
     ' vi-analyzer-report.htm
     echo ""
