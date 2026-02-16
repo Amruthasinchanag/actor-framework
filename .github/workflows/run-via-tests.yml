@@ -49,9 +49,9 @@ jobs:
 
       - name: Generate VI Analyzer Config
         if: github.event_name != 'workflow_dispatch'
-        uses: ./.github/actions/generate_viancfg
+        uses: ./.github/actions/generate-viancfg
         with:
-          template-path: '.github/actions/generate_viancfg/via_template_linux.viancfg'
+          template-path: '.github/actions/generate-viancfg/via_template_linux.viancfg'
           output-path: 'generated-config.viancfg'
           base-branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
 
