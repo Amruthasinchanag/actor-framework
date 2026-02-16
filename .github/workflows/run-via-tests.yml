@@ -77,7 +77,7 @@ jobs:
 
       - name: Run VI Analyzer tests
         if: steps.check-config.outputs.config_exists == 'true'
-        uses: ./.github/actions/run-lv-docker
+        uses: ./.github/actions/via-lv-docker
         with:
           config-path: ${{ steps.config-path.outputs.path }}
           labview-version: '2026q1-linux'
