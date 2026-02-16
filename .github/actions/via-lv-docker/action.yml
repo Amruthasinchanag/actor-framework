@@ -37,8 +37,9 @@ runs:
         
         docker run --rm \
           -v "${{ github.workspace }}:/workspace" \
+          -v "${{ github.action_path }}/run-via.sh:/tmp/run-via.sh" \
           ${{ inputs.docker-image }}:${{ inputs.labview-version }} \
-          bash -c "cd /workspace && chmod +x ${{ github.action_path }}/run-via.sh && ${{ github.action_path }}/run-via.sh '${{ inputs.config-path }}'"
+          bash -c "chmod +x /tmp/run-via.sh && /tmp/run-via.sh '${{ inputs.config-path }}'"
         
         VIA_EXIT_CODE=$?
         echo "exit-code=$VIA_EXIT_CODE" >> $GITHUB_OUTPUT
