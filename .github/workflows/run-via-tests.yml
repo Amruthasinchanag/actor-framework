@@ -38,53 +38,16 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history
 
-      - name: Determine config file path
-        id: config-path
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "path=.github/via-config.viancfg" >> $GITHUB_OUTPUT
-          else
-            echo "path=generated-config.viancfg" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Generate VI Analyzer Config
-        if: github.event_name != 'workflow_dispatch'
-        uses: ./.github/actions/generate-viancfg
-        with:
-          template-path: '.github/actions/generate-viancfg/via_template_linux.viancfg'
-          output-path: 'generated-config.viancfg'
-          base-branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
-
-      - name: Validate if config file exists
-        id: check-config
-        run: |
-          CONFIG_FILE="${{ steps.config-path.outputs.path }}"
-    
-          if [ -f "$CONFIG_FILE" ]; then
-            echo "Using config: $CONFIG_FILE"
-            echo "config_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Error: Config file not found at $CONFIG_FILE"
-            echo "config_exists=false" >> $GITHUB_OUTPUT
-            
-            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-              echo "Manual trigger requires .github/via-config.viancfg to exist"
-              exit 1
-            else
-              echo "No LabVIEW files changed; skipping VI Analyzer tests."
-            fi
-          fi
-
       - name: Run VI Analyzer tests
-        if: steps.check-config.outputs.config_exists == 'true'
         uses: ./.github/actions/via-lv-docker
         with:
-          config-path: ${{ steps.config-path.outputs.path }}
+          config-path: ${{ github.event_name == 'workflow_dispatch' && '.github/via-config.viancfg' || '' }}
+          base-branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
           labview-version: '2026q1-linux'
 
       - name: Upload VI Analyzer Report
         uses: actions/upload-artifact@v4
-        if: always() && steps.check-config.outputs.config_exists == 'true'  # Upload even if tests fail
+        if: always()
         with:
           name: vi-analyzer-report
           path: vi-analyzer-report.htm

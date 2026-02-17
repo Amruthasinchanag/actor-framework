@@ -4,7 +4,16 @@ description: 'Execute LabVIEW VI Analyzer tests using Docker container and parse
 inputs:
   config-path:
     description: 'Path to VI Analyzer configuration file (.viancfg) or LabVIEW files (.vi, .ctl, .llb)'
-    required: true
+    required: false
+    default: ''
+  template-path:
+    description: 'Path to .viancfg template (required to generate config file dynamically)'
+    required: false
+    default: '.github/actions/via-lv-docker/via_template_linux.viancfg'
+  base-branch:
+    description: 'Branch to compare against for changed files (used when generating config)'
+    required: false
+    default: 'origin/develop'
   labview-version:
     description: 'LabVIEW Docker image version tag'
     required: false
@@ -21,10 +30,47 @@ outputs:
   report-path:
     description: 'Path to generated HTML report'
     value: 'vi-analyzer-report.htm'
+  config-used:
+    description: 'Path to the config file that was used'
+    value: ${{ steps.determine-config.outputs.config-path }}
 
 runs:
   using: 'composite'
   steps:
+    - name: Determine config strategy
+      id: determine-config
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.config-path }}" ] && [ -f "${{ inputs.config-path }}" ]; then
+          echo "Using provided file: ${{ inputs.config-path }}"
+          echo "config-path=${{ inputs.config-path }}" >> $GITHUB_OUTPUT
+          echo "generate=false" >> $GITHUB_OUTPUT
+        else
+          echo "Will generate config from changed files"
+          echo "config-path=generated-config.viancfg" >> $GITHUB_OUTPUT
+          echo "generate=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate VI Analyzer Config
+      if: steps.determine-config.outputs.generate == 'true'
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/generate_viancfg.sh
+        ${{ github.action_path }}/generate_viancfg.sh \
+          --template-path "${{ inputs.template-path }}" \
+          --output-path "generated-config.viancfg" \
+          --target-branch "${{ inputs.base-branch }}"
+
+    - name: Validate config exists
+      shell: bash
+      run: |
+        CONFIG_PATH="${{ steps.determine-config.outputs.config-path }}"
+        if [ ! -f "$CONFIG_PATH" ]; then
+          echo "Error: Config file not found at $CONFIG_PATH"
+          exit 1
+        fi
+        echo "Using config: $CONFIG_PATH"
+        
     - name: Pull LabVIEW Docker Image
       shell: bash
       run: docker pull ${{ inputs.docker-image }}:${{ inputs.labview-version }}
