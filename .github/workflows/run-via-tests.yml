@@ -39,11 +39,11 @@ jobs:
           fetch-depth: 0  # Fetch all history
 
       - name: Run VI Analyzer tests
-        uses: ./.github/actions/via-lv-docker
+        uses: KSharma-NI/open-source/via-lv-docker@users/krishsha/via-lv-docker
         with:
-          config-path: ${{ github.event_name == 'workflow_dispatch' && '.github/via-config.viancfg' || '' }}
-          base-branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
-          labview-version: '2026q1-linux'
+          config_path: ${{ github.event_name == 'workflow_dispatch' && '.github/via-config.viancfg' || '' }}
+          base_branch: origin/${{ github.event.pull_request.base.ref || 'develop' }}
+          labview_version: '2026q1-linux'
 
       - name: Upload VI Analyzer Report
         uses: actions/upload-artifact@v4
