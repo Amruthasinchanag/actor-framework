@@ -65,14 +65,18 @@ if [ "$VI_NOT_LOADABLE" -gt 0 ]; then
 
     awk '
         /<h3>VI Not Loadable<\/h3>/,/<\/table>/ {
-        if (match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
-            vi_name = arr[1]
-            vi_path = arr[2]
-            error_msg = arr[3]
-            printf "\n %s\n", vi_name
-            printf "   Path: %s\n", vi_path
-            printf "    %s\n", error_msg
-        }
+            # Extract all table rows from the line
+            line = $0
+            while (match(line, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
+                vi_name = arr[1]
+                vi_path = arr[2]
+                error_msg = arr[3]
+                printf "\n %s\n", vi_name
+                printf "   Path: %s\n", vi_path
+                printf "   → %s\n", error_msg
+                # Remove the matched portion and continue
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
     ' vi-analyzer-report.htm
     echo ""
@@ -86,11 +90,31 @@ if [ "$TEST_NOT_LOADABLE" -gt 0 ]; then
 
     awk '
         /<h3>Test Not Loadable<\/h3>/,/<\/table>/ {
-        if (match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
-            test_name = arr[1]
-            error_msg = arr[2]
-            printf "\n %s\n   → %s\n", test_name, error_msg
+        in_section && /<h3>/ { exit }
+        in_section && /<br><b>([^<]+)<\/b>/ {
+            match($0, /<br><b>([^<]+)<\/b>/, arr)
+            if (current_test != "") print ""
+            current_test = arr[1]
+            printf "\n[%s]\n", current_test
+            next
         }
+        in_section && /<table border=1>/ {
+            # Extract all table rows from this line and subsequent lines
+            line = $0
+            # Keep reading lines until we hit </table> or next section
+            while (line !~ /<\/table>/ && getline nextline > 0) {
+                line = line nextline
+                if (line ~ /<\/table>/) break
+            }
+            # Now process all rows in the accumulated line
+            while (match(line, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
+                vi_name = arr[1]
+                vi_path = arr[2]
+                error_msg = arr[3]
+                printf "  %s\n", vi_name
+                printf "    → %s\n", error_msg
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
     ' vi-analyzer-report.htm
     echo ""
@@ -104,11 +128,31 @@ if [ "$TEST_NOT_RUNNABLE" -gt 0 ]; then
 
     awk '
         /<h3>Test Not Runnable<\/h3>/,/<\/table>/ {
-        if (match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
-            test_name = arr[1]
-            error_msg = arr[2]
-            printf "\n %s\n   → %s\n", test_name, error_msg
+        in_section && /<h3>/ { exit }
+        in_section && /<br><b>([^<]+)<\/b>/ {
+            match($0, /<br><b>([^<]+)<\/b>/, arr)
+            if (current_test != "") print ""
+            current_test = arr[1]
+            printf "\n[%s]\n", current_test
+            next
         }
+        in_section && /<table border=1>/ {
+            # Extract all table rows from this line and subsequent lines
+            line = $0
+            # Keep reading lines until we hit </table> or next section
+            while (line !~ /<\/table>/ && getline nextline > 0) {
+                line = line nextline
+                if (line ~ /<\/table>/) break
+            }
+            # Now process all rows in the accumulated line
+            while (match(line, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
+                vi_name = arr[1]
+                vi_path = arr[2]
+                error_msg = arr[3]
+                printf "  %s\n", vi_name
+                printf "    → %s\n", error_msg
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
     ' vi-analyzer-report.htm
     echo ""
@@ -122,7 +166,7 @@ if [ "$TEST_ERROR_OUT" -gt 0 ]; then
 
     awk '
         /<h3>Test Error Out<\/h3>/ { in_section = 1; next }
-        in_section && /<h3>/ { exit }  # Exit when next h3 section starts
+        in_section && /<h3>/ { exit }
         in_section && /<br><b>([^<]+)<\/b>/ {
             match($0, /<br><b>([^<]+)<\/b>/, arr)
             if (current_test != "") print ""
@@ -130,13 +174,23 @@ if [ "$TEST_ERROR_OUT" -gt 0 ]; then
             printf "\n[%s]\n", current_test
             next
         }
-        in_section && /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/ {
-            match($0, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)
-            vi_name = arr[1]
-            vi_path = arr[2]
-            error_msg = arr[3]
-            printf "  %s\n", vi_name
-            printf "    → %s\n", error_msg
+        in_section && /<table border=1>/ {
+            # Extract all table rows from this line and subsequent lines
+            line = $0
+            # Keep reading lines until we hit </table> or next section
+            while (line !~ /<\/table>/ && getline nextline > 0) {
+                line = line nextline
+                if (line ~ /<\/table>/) break
+            }
+            # Now process all rows in the accumulated line
+            while (match(line, /<tr><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]+)<\/td><\/tr>/, arr)) {
+                vi_name = arr[1]
+                vi_path = arr[2]
+                error_msg = arr[3]
+                printf "  %s\n", vi_name
+                printf "    → %s\n", error_msg
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
     ' vi-analyzer-report.htm
     echo ""
