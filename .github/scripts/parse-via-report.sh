@@ -89,7 +89,7 @@ if [ "$TEST_NOT_LOADABLE" -gt 0 ]; then
     echo "=================================================="
 
     awk '
-        /<h3>Test Not Loadable<\/h3>/,/<\/table>/ {
+        /<h3>Test Not Loadable<\/h3>/ { in_section = 1; next }
         in_section && /<h3>/ { exit }
         in_section && /<br><b>([^<]+)<\/b>/ {
             match($0, /<br><b>([^<]+)<\/b>/, arr)
@@ -127,7 +127,7 @@ if [ "$TEST_NOT_RUNNABLE" -gt 0 ]; then
     echo "=================================================="
 
     awk '
-        /<h3>Test Not Runnable<\/h3>/,/<\/table>/ {
+        /<h3>Test Not Runnable<\/h3>/ { in_section = 1; next }
         in_section && /<h3>/ { exit }
         in_section && /<br><b>([^<]+)<\/b>/ {
             match($0, /<br><b>([^<]+)<\/b>/, arr)
