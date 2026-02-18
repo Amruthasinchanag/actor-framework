@@ -96,4 +96,4 @@ runs:
       run: |
         chmod +x .github/scripts/parse-via-report.sh
         ./.github/scripts/parse-via-report.sh "${{ steps.run-via.outputs.exit-code }}"
-      
+    
