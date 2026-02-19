@@ -58,7 +58,3 @@ jobs:
           # List installed packages
           Write-Host "`nInstalled packages:"
           & nipkg.exe list
-          
-          # Show feeds
-          Write-Host "`nConfigured feeds:"
-          & nipkg.exe list-feeds
