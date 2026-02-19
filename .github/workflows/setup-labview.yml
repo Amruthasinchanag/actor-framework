@@ -21,7 +21,7 @@ jobs:
         uses: KSharma-NI/open-source/setup-labview@users/krishsha/download-labview
         with:
           labview_iso_url: 'https://download.ni.com/support/softlib/labview/labview_development_system/2025_Q3/ni-labview-2025-community-x86_25.3.3_offline.iso'
-          timeout_seconds: 3600
+          timeout_seconds: 1800
           log_level: 'DEBUG'
       
       # Step 3: Activate LabVIEW
@@ -36,16 +36,16 @@ jobs:
       - name: Verify LabVIEW is activated
         shell: pwsh
         run: |
-          Write-Host "=== Verifying LabVIEW Installation ===" -ForegroundColor Cyan
+          Write-Host "=== Verifying LabVIEW Installation ==="
           
           $lvPath = "C:\Program Files\National Instruments\LabVIEW 2025"
           if (Test-Path $lvPath) {
-            Write-Host "✓ LabVIEW installed at $lvPath" -ForegroundColor Green
+            Write-Host "✓ LabVIEW installed at $lvPath"
           } else {
             Write-Error "✗ LabVIEW not found"
           }
           
-          Write-Host "`n=== Checking License Status ===" -ForegroundColor Cyan
+          Write-Host "`n=== Checking License Status ==="
           $nilmUtil = "C:\Program Files (x86)\National Instruments\Shared\License Manager\bin\nilmUtil.exe"
           
           if (Test-Path $nilmUtil) {
