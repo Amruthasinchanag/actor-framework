@@ -22,7 +22,7 @@ jobs:
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
           # Check if nipkg is available
-          Write-Host "=== Verifying NIPM Installation ===" -ForegroundColor Cyan
+          Write-Host "=== Verifying NIPM Installation ==="
           
           $nipkg = Get-Command nipkg.exe -ErrorAction SilentlyContinue
           if (-not $nipkg) {
@@ -30,19 +30,18 @@ jobs:
             exit 1
           }
           
-          Write-Host "✓ nipkg.exe found at: $($nipkg.Source)" -ForegroundColor Green
+          Write-Host "✓ nipkg.exe found at: $($nipkg.Source)"
           
           # Check version
-          Write-Host "`n=== NIPM Version ===" -ForegroundColor Cyan
+          Write-Host "`n=== NIPM Version ==="
           & nipkg.exe --version
           
           # Verify cache setting
-          Write-Host "`n=== Cache Configuration ===" -ForegroundColor Cyan
+          Write-Host "`n=== Cache Configuration ==="
           $cacheConfig = & nipkg.exe get-config nipkg.cachepackages
-          Write-Host "nipkg.cachepackages = $cacheConfig"
           
           if ($cacheConfig -eq 'false') {
-            Write-Host "✓ Package caching is disabled" -ForegroundColor Green
+            Write-Host "✓ Package caching is disabled"
           } else {
             Write-Warning "Package caching is not disabled (value: $cacheConfig)"
           }
@@ -53,7 +52,7 @@ jobs:
           # Refresh environment variables
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
-          Write-Host "=== Testing NIPM Commands ===" -ForegroundColor Cyan
+          Write-Host "=== Testing NIPM Commands ==="
           
           # List installed packages
           Write-Host "`nInstalled packages:"
