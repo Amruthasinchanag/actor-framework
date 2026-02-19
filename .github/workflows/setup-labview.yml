@@ -1,0 +1,55 @@
+name: Test LabVIEW Setup and Activation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-and-activate-labview:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Step 1: Setup NIPM
+      - name: Setup NI Package Manager
+        uses: KSharma-NI/open-source/setup-nipm@users/krishsha/setup-nipm
+        with:
+          log_level: 'DEBUG'
+      
+      # Step 2: Install LabVIEW
+      - name: Setup LabVIEW
+        uses: KSharma-NI/open-source/setup-labview@users/krishsha/download-labview
+        with:
+          labview_iso_url: 'https://download.ni.com/support/softlib/labview/labview_development_system/2025_Q3/ni-labview-2025-community-x86_25.3.3_offline.iso'
+          timeout_seconds: 3600
+          log_level: 'DEBUG'
+      
+      # Step 3: Activate LabVIEW
+      - name: Activate LabVIEW
+        uses: KSharma-NI/open-source/activate-labview@users/krishsha/activate-labview
+        with:
+          serial_number: ${{ secrets.LABVIEW_SERIAL_NUMBER }}
+          package_id: 'LabVIEW_COM_PKG 25.0300'
+          log_level: 'DEBUG'
+      
+      # Step 4: Verify activation
+      - name: Verify LabVIEW is activated
+        shell: pwsh
+        run: |
+          Write-Host "=== Verifying LabVIEW Installation ===" -ForegroundColor Cyan
+          
+          $lvPath = "C:\Program Files\National Instruments\LabVIEW 2025"
+          if (Test-Path $lvPath) {
+            Write-Host "✓ LabVIEW installed at $lvPath" -ForegroundColor Green
+          } else {
+            Write-Error "✗ LabVIEW not found"
+          }
+          
+          Write-Host "`n=== Checking License Status ===" -ForegroundColor Cyan
+          $nilmUtil = "C:\Program Files (x86)\National Instruments\Shared\License Manager\bin\nilmUtil.exe"
+          
+          if (Test-Path $nilmUtil) {
+            & $nilmUtil -status "LabVIEW_COM_PKG 25.0300"
+          } else {
+            Write-Warning "License utility not found"
+          }
