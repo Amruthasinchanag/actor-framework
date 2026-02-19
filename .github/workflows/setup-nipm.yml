@@ -1,0 +1,58 @@
+name: Test NIPM Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-nipm:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout test repo
+        uses: actions/checkout@v4
+      
+      - name: Setup NIPM from your fork
+        uses: KSharma-NI/open-source/setup-nipm@users/krishsha/setup-nipm
+        with:
+          log_level: 'DEBUG'
+      
+      - name: Verify NIPM is installed and configured
+        shell: pwsh
+        run: |
+          # Check if nipkg is available
+          Write-Host "=== Verifying NIPM Installation ===" -ForegroundColor Cyan
+          
+          $nipkg = Get-Command nipkg.exe -ErrorAction SilentlyContinue
+          if (-not $nipkg) {
+            Write-Error "nipkg.exe not found in PATH"
+            exit 1
+          }
+          
+          Write-Host "✓ nipkg.exe found at: $($nipkg.Source)" -ForegroundColor Green
+          
+          # Check version
+          Write-Host "`n=== NIPM Version ===" -ForegroundColor Cyan
+          & nipkg.exe --version
+          
+          # Verify cache setting
+          Write-Host "`n=== Cache Configuration ===" -ForegroundColor Cyan
+          $cacheConfig = & nipkg.exe get-config nipkg.cachepackages
+          Write-Host "nipkg.cachepackages = $cacheConfig"
+          
+          if ($cacheConfig -eq 'false') {
+            Write-Host "✓ Package caching is disabled" -ForegroundColor Green
+          } else {
+            Write-Warning "Package caching is not disabled (value: $cacheConfig)"
+          }
+          
+      - name: Test NIPM functionality
+        shell: pwsh
+        run: |
+          Write-Host "=== Testing NIPM Commands ===" -ForegroundColor Cyan
+          
+          # List installed packages
+          Write-Host "`nInstalled packages:"
+          & nipkg.exe list
+          
+          # Show feeds
+          Write-Host "`nConfigured feeds:"
+          & nipkg.exe list-feeds
