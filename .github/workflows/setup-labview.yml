@@ -44,12 +44,34 @@ jobs:
           } else {
             Write-Error "✗ LabVIEW not found"
           }
+      
+      # Step 5: Configure LabVIEW (add after activation)
+      - name: Configure LabVIEW
+        uses: KSharma-NI/open-source/configure-labview@users/krishsha/configure-labview
+        with:
+          labview_version: '2025'
+          log_level: 'DEBUG'
+
+      # Step 6: Verify configuration
+      - name: Verify LabVIEW configuration
+        shell: pwsh
+        run: |
+          $iniPath = "C:\Program Files (x86)\National Instruments\LabVIEW 2025\LabVIEW.ini"
           
-          Write-Host "`n=== Checking License Status ==="
-          $nilmUtil = "C:\Program Files (x86)\National Instruments\Shared\License Manager\bin\nilmUtil.exe"
-          
-          if (Test-Path $nilmUtil) {
-            & $nilmUtil -status "LabVIEW_COM_PKG 25.0300"
+          if (Test-Path $iniPath) {
+            Write-Host "LabVIEW.ini found" -ForegroundColor Green
+            
+            $content = Get-Content $iniPath
+            
+            # Check for TCP settings
+            if ($content -match "server.tcp.enabled=TRUE") {
+              Write-Host "TCP server enabled" -ForegroundColor Green
+            }
+            
+            # Check for scripting
+            if ($content -match "server.viscripting.ShowScriptingOperationsInEditor=TRUE") {
+              Write-Host "VI Scripting enabled" -ForegroundColor Green
+            }
           } else {
-            Write-Warning "License utility not found"
+            Write-Error "LabVIEW.ini not found"
           }
