@@ -81,7 +81,7 @@ jobs:
         uses: KSharma-NI/open-source/setup-lunit@users/krishsha/install-lunit
         with:
           lv_version: '2025'
-          lv_bitness: '64'
+          lv_bitness: '32'
           log_level: 'DEBUG'
 
       # Step 8: Verify LUnit installation
@@ -102,3 +102,12 @@ jobs:
           
           Write-Host "`n=== Checking Installed Packages ==="
           & $vipmExe list --installed
+      
+      - name: Run LabVIEW Unit Tests
+        uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests
+        with:
+          minimum_supported_lv_version: '2025'
+          supported_bitness: '32'
+          project_path: 'Core\Actor Framework Core.lvproj'  # Update with your actual project path
+          open_project_before_run: false
+          log_level: 'DEBUG'
