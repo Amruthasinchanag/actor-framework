@@ -78,7 +78,7 @@ jobs:
       
       # Step 7: Setup LUnit for G-CLI (add after configure-labview)
       - name: Setup LUnit for G-CLI
-        uses: KSharma-NI/open-source/setup-lunit@users/krishsha/setup-lunit
+        uses: KSharma-NI/open-source/install-lunit@users/krishsha/setup-lunit
         with:
           lv_version: '2025'
           lv_bitness: '64'
