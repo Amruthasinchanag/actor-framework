@@ -75,3 +75,30 @@ jobs:
           } else {
             Write-Error "LabVIEW.ini not found"
           }
+      
+      # Step 7: Setup LUnit for G-CLI (add after configure-labview)
+      - name: Setup LUnit for G-CLI
+        uses: KSharma-NI/open-source/setup-lunit@users/krishsha/setup-lunit
+        with:
+          lv_version: '2025'
+          lv_bitness: '64'
+          log_level: 'DEBUG'
+
+      # Step 8: Verify LUnit installation
+      - name: Verify LUnit and VIPM installation
+        shell: pwsh
+        run: |
+          Write-Host "=== Verifying VIPM Installation ==="
+          
+          $vipmExe = "C:\Program Files\JKI\VI Package Manager\support\vipm.exe"
+          if (Test-Path $vipmExe) {
+            Write-Host "VIPM found at $vipmExe"
+            
+            # Check VIPM version
+            & $vipmExe --version
+          } else {
+            Write-Error "VIPM not found"
+          }
+          
+          Write-Host "`n=== Checking Installed Packages ==="
+          & $vipmExe list --installed
