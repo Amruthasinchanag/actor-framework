@@ -75,8 +75,55 @@ jobs:
           } else {
             Write-Error "LabVIEW.ini not found"
           }
+
+      # Step 7: Setup config files for VIPM
+      - name: Setup VIPM Configuration
+        shell: pwsh
+        run: |
+          Write-Host "=== Setting up VIPM Configuration Files ===" -ForegroundColor Cyan
+          
+          $jkiDir = "C:\ProgramData\JKI"
+          $vipmDir = "C:\ProgramData\JKI\VIPM"
+          
+          # Create directories
+          if (-not (Test-Path $jkiDir)) {
+            New-Item -ItemType Directory -Path $jkiDir -Force | Out-Null
+            Write-Host "Created JKI directory"
+          } else {
+            Write-Host "JKI directory already exists"
+          }
+          
+          if (-not (Test-Path $vipmDir)) {
+            New-Item -ItemType Directory -Path $vipmDir -Force | Out-Null
+            Write-Host "Created VIPM directory"
+          } else {
+            Write-Host "VIPM directory already exists"
+          }
+          
+          # Write jki.conf from secret
+          $jkiConfPath = Join-Path $jkiDir "jki.conf"
+          $jkiConf = @'
+          ${{ secrets.JKI_CONF }}
+          '@
+          Set-Content -Path $jkiConfPath -Value $jkiConf -Force -Encoding UTF8
+          Write-Host "Created jki.conf"
+          
+          # Write Settings.ini from secret
+          $settingsIniPath = Join-Path $vipmDir "Settings.ini"
+          $settingsIni = @'
+          ${{ secrets.VIPM_SETTINGS_INI }}
+          '@
+          Set-Content -Path $settingsIniPath -Value $settingsIni -Force -Encoding UTF8
+          Write-Host "Created Settings.ini"
+          
+          # Verify files exist`
+          if ((Test-Path $jkiConfPath) -and (Test-Path $settingsIniPath)) {
+            Write-Host "VIPM configuration files created successfully"
+          } else {
+            Write-Error "Failed to create VIPM configuration files"
+          }
       
-      # Step 7: Setup LUnit for G-CLI (add after configure-labview)
+      # Step 8: Setup LUnit for G-CLI
       - name: Setup LUnit for G-CLI
         uses: KSharma-NI/open-source/setup-lunit@users/krishsha/install-lunit
         with:
@@ -84,7 +131,7 @@ jobs:
           lv_bitness: '32'
           log_level: 'DEBUG'
 
-      # Step 8: Verify LUnit installation
+      # Step 9: Verify LUnit installation
       - name: Verify LUnit and VIPM installation
         shell: pwsh
         run: |
@@ -108,6 +155,6 @@ jobs:
         with:
           minimum_supported_lv_version: '2025'
           supported_bitness: '32'
-          project_path: 'Core\Actor Framework Core.lvproj'  # Update with your actual project path
+          project_path: 'Core\Actor Framework Core.lvproj'
           open_project_before_run: false
           log_level: 'DEBUG'
