@@ -40,9 +40,9 @@ jobs:
           
           $lvPath = "C:\Program Files\National Instruments\LabVIEW 2025"
           if (Test-Path $lvPath) {
-            Write-Host "✓ LabVIEW installed at $lvPath"
+            Write-Host "LabVIEW installed at $lvPath"
           } else {
-            Write-Error "✗ LabVIEW not found"
+            Write-Error "LabVIEW not found"
           }
       
       # Step 5: Configure LabVIEW (add after activation)
@@ -59,18 +59,18 @@ jobs:
           $iniPath = "C:\Program Files (x86)\National Instruments\LabVIEW 2025\LabVIEW.ini"
           
           if (Test-Path $iniPath) {
-            Write-Host "LabVIEW.ini found" -ForegroundColor Green
+            Write-Host "LabVIEW.ini found"
             
             $content = Get-Content $iniPath
             
             # Check for TCP settings
             if ($content -match "server.tcp.enabled=TRUE") {
-              Write-Host "TCP server enabled" -ForegroundColor Green
+              Write-Host "TCP server enabled"
             }
             
             # Check for scripting
             if ($content -match "server.viscripting.ShowScriptingOperationsInEditor=TRUE") {
-              Write-Host "VI Scripting enabled" -ForegroundColor Green
+              Write-Host "VI Scripting enabled"
             }
           } else {
             Write-Error "LabVIEW.ini not found"
@@ -80,8 +80,7 @@ jobs:
       - name: Setup VIPM Configuration
         shell: pwsh
         run: |
-          Write-Host "=== Setting up VIPM Configuration Files ===" -ForegroundColor Cyan
-          
+          Write-Host "=== Setting up VIPM Configuration Files ==="
           $jkiDir = "C:\ProgramData\JKI"
           $vipmDir = "C:\ProgramData\JKI\VIPM"
           
@@ -134,6 +133,9 @@ jobs:
       # Step 9: Verify LUnit installation
       - name: Verify LUnit and VIPM installation
         shell: pwsh
+        env:
+          LV_VERSION: '2025'
+          LV_BITNESS: '32'
         run: |
           Write-Host "=== Verifying VIPM Installation ==="
           
@@ -148,7 +150,7 @@ jobs:
           }
           
           Write-Host "`n=== Checking Installed Packages ==="
-          & $vipmExe list --installed
+          & $vipmExe list --installed --labview-version $env:LV_VERSION --labview-bitness $env:LV_BITNESS
       
       - name: Run LabVIEW Unit Tests
         uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests
