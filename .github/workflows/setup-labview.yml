@@ -160,4 +160,3 @@ jobs:
           project_path: 'Core\Actor Framework Core.lvproj'
           open_project_before_run: true
           log_level: 'DEBUG'
-          gcli_path: 'C:\Program Files\G-CLI\bin\g-cli.exe'
