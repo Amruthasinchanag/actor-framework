@@ -151,37 +151,6 @@ jobs:
           
           Write-Host "`n=== Checking Installed Packages ==="
           & $vipmExe list --installed --labview-version $env:LV_VERSION --labview-bitness $env:LV_BITNESS
-
-      - name: Add LabVIEWCLI and g-cli to PATH
-        shell: pwsh
-        run: |
-          Write-Host "=== Adding LabVIEWCLI and g-cli to PATH ==="
-          
-          # G-CLI is installed by VIPM to the LabVIEW addon directory
-          $gCliPath = "C:\Program Files (x86)\National Instruments\LabVIEW 2025\vi.lib\Wiresmith Technology\G CLI"
-          $labviewCliPath = "C:\Program Files (x86)\National Instruments\LabVIEW 2025"
-          
-          if (Test-Path $labviewCliPath) {
-            Write-Host "Found LabVIEW directory at $labviewCliPath"
-            Add-Content -Path $env:GITHUB_PATH -Value $labviewCliPath
-            Write-Host "Added LabVIEWCLI to PATH"
-          } else {
-            Write-Error "LabVIEW directory not found at $labviewCliPath"
-          }
-          
-          if (Test-Path $gCliPath) {
-            Write-Host "Found g-cli at $gCliPath"
-            
-            # Add to PATH for this session
-            $env:PATH = "$gCliPath;$env:PATH"
-            
-            # Persist to GITHUB_PATH for subsequent steps
-            Add-Content -Path $env:GITHUB_PATH -Value $gCliPath
-            
-            Write-Host "Added g-cli to PATH"
-          } else {
-            Write-Error "g-cli directory not found at $gCliPath"
-          }
       
       - name: Run LabVIEW Unit Tests
         uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests
@@ -191,3 +160,4 @@ jobs:
           project_path: 'Core\Actor Framework Core.lvproj'
           open_project_before_run: true
           log_level: 'DEBUG'
+          gcli_path: 'C:\Program Files (x86)\National Instruments\LabVIEW 2025\vi.lib\Wiresmith Technology\G CLI'
