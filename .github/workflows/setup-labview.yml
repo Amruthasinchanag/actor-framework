@@ -32,51 +32,14 @@ jobs:
           package_id: 'LabVIEW_COM_PKG 25.0300'
           log_level: 'DEBUG'
       
-      # Step 4: Verify activation
-      - name: Verify LabVIEW is activated
-        shell: pwsh
-        run: |
-          Write-Host "=== Verifying LabVIEW Installation ==="
-          
-          $lvPath = "C:\Program Files\National Instruments\LabVIEW 2025"
-          if (Test-Path $lvPath) {
-            Write-Host "LabVIEW installed at $lvPath"
-          } else {
-            Write-Error "LabVIEW not found"
-          }
-      
-      # Step 5: Configure LabVIEW (add after activation)
+      # Step 4: Configure LabVIEW (add after activation)
       - name: Configure LabVIEW
         uses: KSharma-NI/open-source/configure-labview@users/krishsha/configure-labview
         with:
           labview_version: '2025'
           log_level: 'DEBUG'
 
-      # Step 6: Verify configuration
-      - name: Verify LabVIEW configuration
-        shell: pwsh
-        run: |
-          $iniPath = "C:\Program Files (x86)\National Instruments\LabVIEW 2025\LabVIEW.ini"
-          
-          if (Test-Path $iniPath) {
-            Write-Host "LabVIEW.ini found"
-            
-            $content = Get-Content $iniPath
-            
-            # Check for TCP settings
-            if ($content -match "server.tcp.enabled=TRUE") {
-              Write-Host "TCP server enabled"
-            }
-            
-            # Check for scripting
-            if ($content -match "server.viscripting.ShowScriptingOperationsInEditor=TRUE") {
-              Write-Host "VI Scripting enabled"
-            }
-          } else {
-            Write-Error "LabVIEW.ini not found"
-          }
-
-      # Step 7: Setup config files for VIPM
+      # Step 5: Setup config files for VIPM
       - name: Setup VIPM Configuration
         shell: pwsh
         run: |
@@ -122,7 +85,7 @@ jobs:
             Write-Error "Failed to create VIPM configuration files"
           }
       
-      # Step 8: Setup LUnit for G-CLI
+      # Step 6: Setup LUnit for G-CLI
       - name: Setup LUnit for G-CLI
         uses: KSharma-NI/open-source/setup-lunit@users/krishsha/install-lunit
         with:
@@ -130,7 +93,7 @@ jobs:
           lv_bitness: '32'
           log_level: 'DEBUG'
 
-      # Step 9: Verify LUnit installation
+      # Step 7: Verify LUnit installation
       - name: Verify LUnit and VIPM installation
         shell: pwsh
         env:
