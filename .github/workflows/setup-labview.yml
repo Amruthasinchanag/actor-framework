@@ -1,4 +1,4 @@
-name: Test LabVIEW Setup and Activation
+name: Run Unit Tests
 
 on:
   workflow_dispatch:
