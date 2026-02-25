@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run LabVIEW Unit Tests in Docker
-        uses: KSharma-NI/open-source/run-unit-tests-docker@users/krishsha/run-unit-tests-docker@v1
+        uses: KSharma-NI/open-source/run-unit-tests-docker@users/krishsha/run-unit-tests-docker
         with:
           docker_image: nationalinstruments/labview:2026q1-windows
           lv_version: '2026'
