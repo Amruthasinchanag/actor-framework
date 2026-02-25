@@ -11,6 +11,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup VIPM Configuration
+        shell: pwsh
+        run: |
+          Write-Host "=== Setting up VIPM Configuration Files ==="
+          
+          # Create temporary directory for config files
+          $tempConfigDir = Join-Path $env:RUNNER_TEMP "vipm-config"
+          New-Item -ItemType Directory -Path $tempConfigDir -Force | Out-Null
+          Write-Host "Created temp config directory: $tempConfigDir"
+          
+          # Write jki.conf from secret
+          $jkiConfPath = Join-Path $tempConfigDir "jki.conf"
+          $jkiConf = @'
+          ${{ secrets.JKI_CONF }}
+          '@
+          Set-Content -Path $jkiConfPath -Value $jkiConf -Force -Encoding UTF8
+          Write-Host "Created jki.conf"
+          
+          # Write Settings.ini from secret
+          $settingsIniPath = Join-Path $tempConfigDir "Settings.ini"
+          $settingsIni = @'
+          ${{ secrets.VIPM_SETTINGS_INI_26Q1 }}
+          '@
+          Set-Content -Path $settingsIniPath -Value $settingsIni -Force -Encoding UTF8
+          Write-Host "Created Settings.ini"
+          
+          # Verify files exist
+          if ((Test-Path $jkiConfPath) -and (Test-Path $settingsIniPath)) {
+            Write-Host "VIPM configuration files created successfully"
+          } else {
+            Write-Error "Failed to create VIPM configuration files"
+            exit 1
+          }
+          
+          # Export path for use in next step
+          "VIPM_CONFIG_DIR=$tempConfigDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Run LabVIEW Unit Tests in Docker
         uses: KSharma-NI/open-source/run-unit-tests-docker@users/krishsha/run-unit-tests-docker
         with:
