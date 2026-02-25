@@ -5,49 +5,18 @@ on:
 
 jobs:
   run-unit-tests:
-    runs-on: windows-latest  # Changed from windows-latest
-    container:
-      image: nationalinstruments/labview:2026q1-windows
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-      
-      # Step 6: Setup LUnit for G-CLI
-      - name: Setup LUnit for G-CLI
-        uses: KSharma-NI/open-source/setup-lunit@users/krishsha/install-lunit
+
+      - name: Run LabVIEW Unit Tests in Docker
+        uses: KSharma-NI/open-source/run-unit-tests-docker@users/krishsha/run-unit-tests-docker@v1
         with:
+          docker_image: nationalinstruments/labview:2026q1-windows
           lv_version: '2026'
           lv_bitness: '64'
-          log_level: 'DEBUG'
-
-      # Step 7: Verify LUnit installation
-      - name: Verify LUnit and VIPM installation
-        shell: pwsh
-        env:
-          LV_VERSION: '2026'
-          LV_BITNESS: '64'
-        run: |
-          Write-Host "=== Verifying VIPM Installation ==="
-          
-          $vipmExe = "C:\Program Files\JKI\VI Package Manager\support\vipm.exe"
-          if (Test-Path $vipmExe) {
-            Write-Host "VIPM found at $vipmExe"
-            
-            # Check VIPM version
-            & $vipmExe --version
-          } else {
-            Write-Error "VIPM not found"
-          }
-          
-          Write-Host "`n=== Checking Installed Packages ==="
-          & $vipmExe list --installed --labview-version $env:LV_VERSION --labview-bitness $env:LV_BITNESS
-      
-      - name: Run LabVIEW Unit Tests
-        uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests
-        with:
-          minimum_supported_lv_version: '2026'
-          supported_bitness: '64'
           project_path: 'Core\Actor Framework Core.lvproj'
           open_project_before_run: true
           log_level: 'DEBUG'
