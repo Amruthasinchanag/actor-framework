@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup-and-activate-labview:
+  run-unit-tests:
     runs-on: windows-latest
     steps:
       - name: Checkout
