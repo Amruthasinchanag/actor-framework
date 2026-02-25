@@ -55,5 +55,6 @@ jobs:
           lv_version: '2026'
           lv_bitness: '64'
           project_path: 'Core\Actor Framework Core.lvproj'
+          vipm_config_dir: ${{ env.VIPM_CONFIG_DIR }}
           open_project_before_run: true
           log_level: 'DEBUG'
