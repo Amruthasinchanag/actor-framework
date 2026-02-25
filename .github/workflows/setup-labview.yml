@@ -1,104 +1,32 @@
-name: Run Unit Tests
+name: Run Unit Tests (docker)
 
 on:
   workflow_dispatch:
 
 jobs:
   run-unit-tests:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest  # Changed from windows-latest
+    container:
+      image: nationalinstruments/labview:2026q1-windows
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      # Step 1: Setup NIPM
-      - name: Setup NI Package Manager
-        uses: KSharma-NI/open-source/setup-nipm@users/krishsha/setup-nipm
-        with:
-          log_level: 'DEBUG'
-      
-      # Step 2: Install LabVIEW
-      - name: Setup LabVIEW
-        uses: KSharma-NI/open-source/setup-labview@users/krishsha/download-labview
-        with:
-          labview_iso_url: 'https://download.ni.com/support/softlib/labview/labview_development_system/2025_Q3/ni-labview-2025-community-x86_25.3.3_offline.iso'
-          timeout_seconds: 1800
-          log_level: 'DEBUG'
-      
-      # Step 3: Activate LabVIEW
-      - name: Activate LabVIEW
-        uses: KSharma-NI/open-source/activate-labview@users/krishsha/activate-labview
-        with:
-          serial_number: ${{ secrets.LABVIEW_SERIAL_NUMBER }}
-          package_id: 'LabVIEW_COM_PKG 25.0300'
-          log_level: 'DEBUG'
-      
-      # Step 4: Configure LabVIEW (add after activation)
-      - name: Configure LabVIEW
-        uses: KSharma-NI/open-source/configure-labview@users/krishsha/configure-labview
-        with:
-          labview_version: '2025'
-          log_level: 'DEBUG'
-
-      # Step 5: Setup config files for VIPM
-      - name: Setup VIPM Configuration
-        shell: pwsh
-        run: |
-          Write-Host "=== Setting up VIPM Configuration Files ==="
-          $jkiDir = "C:\ProgramData\JKI"
-          $vipmDir = "C:\ProgramData\JKI\VIPM"
-          
-          # Create directories
-          if (-not (Test-Path $jkiDir)) {
-            New-Item -ItemType Directory -Path $jkiDir -Force | Out-Null
-            Write-Host "Created JKI directory"
-          } else {
-            Write-Host "JKI directory already exists"
-          }
-          
-          if (-not (Test-Path $vipmDir)) {
-            New-Item -ItemType Directory -Path $vipmDir -Force | Out-Null
-            Write-Host "Created VIPM directory"
-          } else {
-            Write-Host "VIPM directory already exists"
-          }
-          
-          # Write jki.conf from secret
-          $jkiConfPath = Join-Path $jkiDir "jki.conf"
-          $jkiConf = @'
-          ${{ secrets.JKI_CONF }}
-          '@
-          Set-Content -Path $jkiConfPath -Value $jkiConf -Force -Encoding UTF8
-          Write-Host "Created jki.conf"
-          
-          # Write Settings.ini from secret
-          $settingsIniPath = Join-Path $vipmDir "Settings.ini"
-          $settingsIni = @'
-          ${{ secrets.VIPM_SETTINGS_INI }}
-          '@
-          Set-Content -Path $settingsIniPath -Value $settingsIni -Force -Encoding UTF8
-          Write-Host "Created Settings.ini"
-          
-          # Verify files exist`
-          if ((Test-Path $jkiConfPath) -and (Test-Path $settingsIniPath)) {
-            Write-Host "VIPM configuration files created successfully"
-          } else {
-            Write-Error "Failed to create VIPM configuration files"
-          }
       
       # Step 6: Setup LUnit for G-CLI
       - name: Setup LUnit for G-CLI
         uses: KSharma-NI/open-source/setup-lunit@users/krishsha/install-lunit
         with:
-          lv_version: '2025'
-          lv_bitness: '32'
+          lv_version: '2026'
+          lv_bitness: '64'
           log_level: 'DEBUG'
 
       # Step 7: Verify LUnit installation
       - name: Verify LUnit and VIPM installation
         shell: pwsh
         env:
-          LV_VERSION: '2025'
-          LV_BITNESS: '32'
+          LV_VERSION: '2026'
+          LV_BITNESS: '64'
         run: |
           Write-Host "=== Verifying VIPM Installation ==="
           
@@ -118,8 +46,8 @@ jobs:
       - name: Run LabVIEW Unit Tests
         uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests
         with:
-          minimum_supported_lv_version: '2025'
-          supported_bitness: '32'
+          minimum_supported_lv_version: '2026'
+          supported_bitness: '64'
           project_path: 'Core\Actor Framework Core.lvproj'
           open_project_before_run: true
           log_level: 'DEBUG'
