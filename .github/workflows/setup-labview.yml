@@ -81,7 +81,7 @@ jobs:
       
       # Step 5: Setup LUnit CLI
       - name: Setup LUnit CLI
-        uses: KSharma-NI/open-source/setup-lunit@users/krishsha/run-unit-tests-lunit
+        uses: KSharma-NI/open-source/setup-lunit@users/krishsha/run-unit-tests-action
         with:
           lv_version: '2025'
           lv_bitness: '32'
@@ -110,7 +110,7 @@ jobs:
           & $vipmExe list --installed --labview-version $env:LV_VERSION --labview-bitness $env:LV_BITNESS
       
       - name: Run LabVIEW Unit Tests
-        uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests-lunit
+        uses: KSharma-NI/open-source/run-unit-tests@users/krishsha/run-unit-tests-action
         with:
           minimum_supported_lv_version: '2025'
           supported_bitness: '32'
