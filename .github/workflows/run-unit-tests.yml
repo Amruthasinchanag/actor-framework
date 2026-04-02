@@ -145,7 +145,7 @@ jobs:
             Write-Error "Failed to create VIPM configuration files"
           }
       
-      # Step 6: Setup LUnit for G-CLI
+      # Step 5: Setup LUnit for G-CLI
       - name: Setup LUnit for G-CLI
         uses: ni/open-source/setup-lunit@actions
         with:
@@ -153,7 +153,7 @@ jobs:
           lv_bitness: ${{ steps.lv_info.outputs.lv_bitness }}
           log_level: 'DEBUG'
 
-      # Step 7: Verify LUnit installation
+      # Step 6: Verify LUnit installation
       - name: Verify LUnit and VIPM installation
         shell: pwsh
         env:
