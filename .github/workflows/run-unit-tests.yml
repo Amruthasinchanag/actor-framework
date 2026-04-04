@@ -99,51 +99,49 @@ jobs:
           labview_version: ${{ steps.lv_info.outputs.lv_version }}
           log_level: 'DEBUG'
 
-      # Step 4: Setup config files for VIPM
-      - name: Setup VIPM Configuration
+      # Step 4: Activate VIPM
+      - name: Activate VIPM
         shell: pwsh
         run: |
-          Write-Host "=== Setting up VIPM Configuration Files ==="
-          $jkiDir = "C:\ProgramData\JKI"
-          $vipmDir = "C:\ProgramData\JKI\VIPM"
+          $vipmExe = "C:\Program Files\JKI\VI Package Manager\support\vipm.exe"
           
-          # Create directories
-          if (-not (Test-Path $jkiDir)) {
-            New-Item -ItemType Directory -Path $jkiDir -Force | Out-Null
-            Write-Host "Created JKI directory"
+          if (-not (Test-Path $vipmExe)) {
+            Write-Host "VIPM not found. Installing VIPM..."
+            $installerUrl = "https://packages.jki.net/vipm/preview/vipm-setup-latest-preview.exe"
+            $installerPath = Join-Path $env:TEMP "vipm-setup.exe"
+            
+            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+            
+            $process = Start-Process -FilePath $installerPath -ArgumentList "/quiet", "/norestart" -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+              Write-Error "VIPM installation failed with exit code $($process.ExitCode)"
+              exit 1
+            }
+            
+            Remove-Item $installerPath -Force
+            
+            if (-not (Test-Path $vipmExe)) {
+              Write-Error "VIPM executable not found at $vipmExe after installation"
+              exit 1
+            }
+            
+            Write-Host "VIPM installed successfully"
           } else {
-            Write-Host "JKI directory already exists"
+            Write-Host "VIPM already installed at $vipmExe"
           }
           
-          if (-not (Test-Path $vipmDir)) {
-            New-Item -ItemType Directory -Path $vipmDir -Force | Out-Null
-            Write-Host "Created VIPM directory"
-          } else {
-            Write-Host "VIPM directory already exists"
+          Write-Host "Activating VIPM..."
+          & $vipmExe activate `
+            --serial-number "${{ secrets.VIPM_SERIAL_NUMBER }}" `
+            --name "${{ secrets.VIPM_NAME }}" `
+            --email "${{ secrets.VIPM_EMAIL }}"
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "VIPM activation failed with exit code $LASTEXITCODE"
+            exit 1
           }
           
-          # Write jki.conf from secret
-          $jkiConfPath = Join-Path $jkiDir "jki.conf"
-          $jkiConf = @'
-          ${{ secrets.JKI_CONF }}
-          '@
-          Set-Content -Path $jkiConfPath -Value $jkiConf -Force -Encoding UTF8
-          Write-Host "Created jki.conf"
-          
-          # Write Settings.ini from secret
-          $settingsIniPath = Join-Path $vipmDir "Settings.ini"
-          $settingsIni = @'
-          ${{ secrets.VIPM_SETTINGS_INI }}
-          '@
-          Set-Content -Path $settingsIniPath -Value $settingsIni -Force -Encoding UTF8
-          Write-Host "Created Settings.ini"
-          
-          # Verify files exist`
-          if ((Test-Path $jkiConfPath) -and (Test-Path $settingsIniPath)) {
-            Write-Host "VIPM configuration files created successfully"
-          } else {
-            Write-Error "Failed to create VIPM configuration files"
-          }
+          Write-Host "VIPM activated successfully"
       
       # Step 5: Setup LUnit for G-CLI
       - name: Setup LUnit for G-CLI
