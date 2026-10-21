@@ -14,24 +14,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  LABVIEW_IMAGE: nationalinstruments/labview:2026q1patch1-windows
+  LABVIEW_IMAGE: nationalinstruments/labview:2026q1patch1-linux
   AF_CONTAINER_NAME: af-lunit-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   lunit-tests:
-    name: Run LUnit tests (Windows container)
-    runs-on: windows-2022
+    name: Run LUnit tests (Linux container)
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     defaults:
       run:
-        shell: pwsh
+        shell: bash
 
     steps:
       - name: Check PR trust boundary
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         run: |
-          throw "Fork PRs cannot access VIPM Pro credentials. A maintainer must review and push the changes to a trusted repository branch to run this workflow. Do not use pull_request_target to execute fork code with secrets."
+          echo "::error::Fork PRs cannot access VIPM Pro credentials. A maintainer must review and push changes to a trusted branch. Do not use pull_request_target to run fork code with secrets."
+          exit 1
 
       - name: Checkout source and migrated tests
         uses: actions/checkout@v5
@@ -44,46 +45,36 @@ jobs:
           VIPM_FULL_NAME: ${{ secrets.VIPM_FULL_NAME }}
           VIPM_EMAIL: ${{ secrets.VIPM_EMAIL }}
         run: |
-          foreach ($name in @('VIPM_SERIAL_NUMBER', 'VIPM_FULL_NAME', 'VIPM_EMAIL')) {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
-              throw "Required repository secret is missing: $name. VIPM Pro is required for container dependency installation."
-            }
-          }
+          for name in VIPM_SERIAL_NUMBER VIPM_FULL_NAME VIPM_EMAIL; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Required repository secret is missing: $name"
+              exit 1
+            fi
+          done
 
-      - name: Pull and inspect Windows LabVIEW image
+      - name: Pull and inspect Linux LabVIEW image
         run: |
-          $ErrorActionPreference = 'Stop'
-          $dockerOS = docker info --format '{{.OSType}}'
-          if ($LASTEXITCODE -ne 0 -or $dockerOS -ne 'windows') {
-            throw "A running Docker engine in Windows-container mode is required."
+          [[ "$(docker info --format '{{.OSType}}')" == linux ]] || {
+            echo "::error::A running Docker engine in Linux-container mode is required."
+            exit 1
           }
-          docker pull $env:LABVIEW_IMAGE
-          if ($LASTEXITCODE -ne 0) { throw "Failed to pull $env:LABVIEW_IMAGE" }
-
-          $metadata = docker image inspect $env:LABVIEW_IMAGE
-          if ($LASTEXITCODE -ne 0) { throw "Failed to inspect the LabVIEW image." }
-          $image = @($metadata | ConvertFrom-Json)[0]
-          if ($image.Os -ne 'windows' -or $image.Architecture -ne 'amd64') {
-            throw "Expected a Windows amd64 LabVIEW image."
-          }
-          $yearEntry = $image.Config.Env | Where-Object { $_ -match '^LV_YEAR=\d{4}$' } | Select-Object -First 1
-          if (-not $yearEntry) { throw "LV_YEAR is missing or invalid in the LabVIEW image." }
-          "LV_YEAR=$($yearEntry.Substring('LV_YEAR='.Length))" >> $env:GITHUB_ENV
+          docker pull "$LABVIEW_IMAGE"
+          docker image inspect "$LABVIEW_IMAGE" > "$RUNNER_TEMP/labview-image.json"
+          jq -e '.[0] | .Os == "linux" and .Architecture == "amd64"' "$RUNNER_TEMP/labview-image.json"
+          lv_year=$(jq -er '.[0].Config.Env[] | select(test("^LV_YEAR=[0-9]{4}$")) | sub("^LV_YEAR="; "")' "$RUNNER_TEMP/labview-image.json")
+          echo "LV_YEAR=$lv_year" >> "$GITHUB_ENV"
 
       - name: Start container and copy bootstrap script
         run: |
-          docker create --name $env:AF_CONTAINER_NAME $env:LABVIEW_IMAGE `
-            powershell -NoLogo -NoProfile -Command "Start-Sleep -Seconds 7200"
-          if ($LASTEXITCODE -ne 0) { throw "Failed to create the LabVIEW container." }
-          "AF_CONTAINER_CREATED=true" >> $env:GITHUB_ENV
-          docker start $env:AF_CONTAINER_NAME
-          if ($LASTEXITCODE -ne 0) { throw "Failed to start the LabVIEW container." }
-          docker exec $env:AF_CONTAINER_NAME powershell -NoProfile -Command `
-            "New-Item -ItemType Directory -Path C:\unit-test-results -Force | Out-Null"
-          if ($LASTEXITCODE -ne 0) { throw "The container is not responsive." }
-          docker cp "$env:GITHUB_WORKSPACE\pipeline\scripts\Invoke-LUnitContainer.ps1" `
-            "$($env:AF_CONTAINER_NAME):C:\Invoke-LUnitContainer.ps1"
-          if ($LASTEXITCODE -ne 0) { throw "Failed to copy the bootstrap script." }
+          mkdir -p "$GITHUB_WORKSPACE/lunit-results"
+          echo "Starting Linux container $AF_CONTAINER_NAME" > "$GITHUB_WORKSPACE/lunit-results/container-lifecycle.log"
+          docker create --name "$AF_CONTAINER_NAME" --user root --entrypoint /bin/bash \
+            "$LABVIEW_IMAGE" -c "sleep 7200"
+          echo "AF_CONTAINER_CREATED=true" >> "$GITHUB_ENV"
+          docker start "$AF_CONTAINER_NAME"
+          docker exec "$AF_CONTAINER_NAME" mkdir -p /unit-test-results
+          docker cp "$GITHUB_WORKSPACE/pipeline/scripts/invoke-lunit-container.sh" \
+            "$AF_CONTAINER_NAME:/invoke-lunit-container.sh"
 
       - name: Install VIPM and LUnit inside container
         timeout-minutes: 25
@@ -92,43 +83,44 @@ jobs:
           VIPM_FULL_NAME: ${{ secrets.VIPM_FULL_NAME }}
           VIPM_EMAIL: ${{ secrets.VIPM_EMAIL }}
         run: |
-          docker exec `
-            -e VIPM_SERIAL_NUMBER -e VIPM_FULL_NAME -e VIPM_EMAIL `
-            -e LV_YEAR="$env:LV_YEAR" `
-            $env:AF_CONTAINER_NAME `
-            powershell -NoLogo -NoProfile -ExecutionPolicy Bypass `
-            -File C:\Invoke-LUnitContainer.ps1 -Mode Setup
-          if ($LASTEXITCODE -ne 0) { throw "VIPM/LUnit dependency setup failed." }
+          docker exec \
+            -e VIPM_SERIAL_NUMBER -e VIPM_FULL_NAME -e VIPM_EMAIL \
+            -e LV_YEAR \
+            "$AF_CONTAINER_NAME" bash /invoke-lunit-container.sh setup
 
       - name: Restart container and copy source
         run: |
           # Discard the LabVIEW instance used by VIPM before starting LabVIEW CLI.
-          docker restart $env:AF_CONTAINER_NAME
-          if ($LASTEXITCODE -ne 0) { throw "Failed to restart the LabVIEW container." }
-          docker cp "$env:GITHUB_WORKSPACE\." "$($env:AF_CONTAINER_NAME):C:\actor-framework"
-          if ($LASTEXITCODE -ne 0) { throw "Failed to copy the source and test project." }
+          docker restart "$AF_CONTAINER_NAME"
+          docker exec "$AF_CONTAINER_NAME" mkdir -p /actor-framework
+          docker cp "$GITHUB_WORKSPACE/." "$AF_CONTAINER_NAME:/actor-framework"
 
       - name: Run LUnit through native LabVIEW CLI
         id: run-tests
         timeout-minutes: 20
         run: |
-          docker exec -e LV_YEAR="$env:LV_YEAR" $env:AF_CONTAINER_NAME `
-            powershell -NoLogo -NoProfile -ExecutionPolicy Bypass `
-            -File C:\Invoke-LUnitContainer.ps1 -Mode Test
-          if ($LASTEXITCODE -ne 0) { throw "LUnit execution failed. See the test-results artifact." }
+          docker exec -e LV_YEAR "$AF_CONTAINER_NAME" bash /invoke-lunit-container.sh test
 
       - name: Collect container reports and logs
         if: always() && env.AF_CONTAINER_CREATED == 'true'
         run: |
-          New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE\lunit-results" -Force | Out-Null
-          docker cp "$($env:AF_CONTAINER_NAME):C:\unit-test-results\." "$env:GITHUB_WORKSPACE\lunit-results"
-          if ($LASTEXITCODE -ne 0) { throw "Failed to collect container reports and logs." }
+          set +e
+          docker logs "$AF_CONTAINER_NAME" > "$GITHUB_WORKSPACE/lunit-results/docker.log" 2>&1
+          log_status=$?
+          docker cp "$AF_CONTAINER_NAME:/unit-test-results/." "$GITHUB_WORKSPACE/lunit-results" \
+            2>> "$GITHUB_WORKSPACE/lunit-results/container-lifecycle.log"
+          copy_status=$?
+          if (( log_status != 0 || copy_status != 0 )); then
+            echo "::error::Log collection failed (docker logs: $log_status, docker cp: $copy_status). See container-lifecycle.log."
+            exit 1
+          fi
 
       - name: Validate JUnit report and test discovery
         if: ${{ !cancelled() && steps.run-tests.outcome == 'success' }}
+        shell: pwsh
         run: |
-          $result = & .\pipeline\scripts\Assert-LUnitReport.ps1 `
-            -ReportPath "$env:GITHUB_WORKSPACE\lunit-results\lunit.xml" -MinimumTests 13
+          $result = & ./pipeline/scripts/Assert-LUnitReport.ps1 `
+            -ReportPath "$env:GITHUB_WORKSPACE/lunit-results/lunit.xml" -MinimumTests 13
           "LUnit: $($result.Executed) tests executed; $($result.Skipped) skipped." >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload LUnit reports and logs
@@ -142,6 +134,4 @@ jobs:
 
       - name: Remove LabVIEW container
         if: always() && env.AF_CONTAINER_CREATED == 'true'
-        run: |
-          docker rm -f $env:AF_CONTAINER_NAME
-          if ($LASTEXITCODE -ne 0) { throw "Failed to remove the LabVIEW container." }
+        run: docker rm -f "$AF_CONTAINER_NAME"
