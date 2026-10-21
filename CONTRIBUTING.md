@@ -343,6 +343,7 @@ The repository uses GitHub Actions for continuous integration:
 | `ci.yml` | Runs on PRs — validates builds and tests |
 | `build-vi-package.yml` | Builds the VIPM package |
 | `run-unit-tests.yml` | Executes unit tests |
+| [`lunit-container-tests.yml`](.github/workflows/lunit-container-tests.yml) | Runs migrated LUnit tests in a Windows LabVIEW container on pushes and PRs; see [setup requirements](docs/lunit-container-tests.md) |
 | `run-via-tests.yml` | Runs VI Analyzer tests |
 | `release.yml` | Creates tagged releases |
 | `create-distribution-artifact.yml` | Generates distribution artifacts for LabVIEW integration |
