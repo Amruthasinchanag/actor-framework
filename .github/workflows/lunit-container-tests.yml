@@ -210,8 +210,20 @@ jobs:
             exit 1
           fi
           cd /actor-framework
+          # Project-inspection tests require an open project, not only test discovery from its path.
+          labview="/usr/local/natinst/LabVIEW-${LV_YEAR}-64/labviewprofull"
+          echo "Starting headless LabVIEW with project: $project"
+          "$labview" --headless "$project" > /unit-test-results/labview-test.log 2>&1 &
+          labview_pid=$!
+          ready=false
+          for (( attempt=0; attempt<90; attempt++ )); do
+            kill -0 "$labview_pid" || { echo "LabVIEW exited; see labview-test.log." >&2; exit 1; }
+            if (echo > /dev/tcp/127.0.0.1/3363) 2>/dev/null; then ready=true; break; fi
+            sleep 2
+          done
+          [[ "$ready" == true ]] || { echo "LabVIEW VI Server readiness timed out; see labview-test.log." >&2; exit 1; }
           LabVIEWCLI -OperationName LUnit \
-            -LabVIEWPath "/usr/local/natinst/LabVIEW-${LV_YEAR}-64/labviewprofull" \
+            -LabVIEWPath "$labview" -PortNumber 3363 \
             -AdditionalOperationDirectory "/usr/local/natinst/LabVIEW-${LV_YEAR}-64/vi.lib/Astemes/LUnit CLI" \
             -Path "$project" -ReportPath /unit-test-results/lunit.xml -LogToConsole TRUE -Headless
           TEST

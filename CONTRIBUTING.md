@@ -353,6 +353,13 @@ secrets `VIPM_SERIAL_NUMBER`, `VIPM_FULL_NAME`, and `VIPM_EMAIL` for VIPM Pro
 activation. Fork PRs cannot access these secrets and fail with an explicit message.
 It tests the source project with 64-bit LabVIEW 2026 Q1 Patch 1, installs LUnit
 from the current VIPM feed, and requires at least 13 non-skipped passing tests.
+Before invoking LUnit CLI, the workflow launches headless LabVIEW with the source
+project and waits for VI Server on port 3363, which the CLI then connects to.
+This is intended to retain the open-project context required by the `Missing in
+Project` tests; passing `-Path` to LUnit alone did not make those tests pass.
+Startup output is collected in `labview-test.log`. A listening VI Server confirms
+server readiness, not project validity; the full test results remain the check
+that project inspection succeeds.
 Setup follows the Linux VIP build: VIPM `26.3.1-4025`, Xvfb started before VIPM
 installation, and matching Desktop/runtime startup limits. Activation has a
 600-second external limit (plus 30 seconds before forced termination);
