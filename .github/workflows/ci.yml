@@ -21,12 +21,8 @@ on:
       - reopened
       - ready_for_review
 
+  # TEMPORARY: run on pushes to any branch for testing. Restore the branch list before merging.
   push:
-    branches:
-      - main
-      - releases/*
-      - hotfix/*
-      - feature/*
 
   workflow_dispatch:
 
@@ -63,7 +59,7 @@ jobs:
 
   create-artifact:
     name: Create distribution artifact
-    needs: via-tests
+    # TEMPORARY: no longer waits for via-tests, to check whether the later jobs pass.
     uses: ./.github/workflows/create-distribution-artifact.yml
     with:
       upload-artifact: true
