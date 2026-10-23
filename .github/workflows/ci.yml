@@ -35,169 +35,20 @@ jobs:
     name: Run VI Analyzer tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      # LUnit test VIs only load when LUnit is in vi.lib. The shared action pulls the image it
-      # analyzes in, so this job builds a LabVIEW image with LUnit installed and serves it from
-      # a registry that exists only on this runner. Nothing is published.
-      VIA_BASE_IMAGE: nationalinstruments/labview:2026q1patch1-linux
-      VIA_IMAGE_REPO: localhost:5000/labview-lunit
-      VIA_IMAGE_TAG: 2026q1patch1-linux
-      VIA_BUILD_CONTAINER: af-via-lunit-${{ github.run_id }}-${{ github.run_attempt }}
-
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      # Same file selection as the shared action, so the image is only built when needed.
-      - name: Check for LabVIEW files to analyze
-        id: changes
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_BRANCH: origin/${{ github.event.pull_request.base.ref || 'main' }}
-        run: |
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            echo "analyze=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          count=$(git diff --name-only "$BASE_BRANCH" --diff-filter=d | grep -cE '\.(vi|ctl|llb)$' || true)
-          echo "Changed LabVIEW files against $BASE_BRANCH: $count"
-          if (( count > 0 )); then
-            echo "analyze=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "analyze=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build LabVIEW image with LUnit installed
-        if: steps.changes.outputs.analyze == 'true'
-        run: |
-          trap 'docker cp "$VIA_BUILD_CONTAINER:/via-setup/." "$GITHUB_WORKSPACE/via-setup-logs" 2>/dev/null || true' EXIT
-          mkdir -p "$GITHUB_WORKSPACE/via-setup-logs"
-          docker run -d --name af-via-registry -p 5000:5000 registry:2
-          docker pull "$VIA_BASE_IMAGE"
-          lv_year=$(docker image inspect "$VIA_BASE_IMAGE" |
-            jq -er '.[0].Config.Env[] | select(test("^LV_YEAR=[0-9]{4}$")) | sub("^LV_YEAR="; "")')
-          docker create --name "$VIA_BUILD_CONTAINER" --user root --entrypoint /bin/bash \
-            "$VIA_BASE_IMAGE" -c "sleep 7200"
-          echo "VIA_BUILD_CREATED=true" >> "$GITHUB_ENV"
-          docker start "$VIA_BUILD_CONTAINER"
-          docker exec "$VIA_BUILD_CONTAINER" mkdir -p /via-setup
-
-          # Same installation steps as the LUnit job (lunit-container-tests.yml).
-          docker exec -i \
-            -e LV_YEAR="$lv_year" \
-            "$VIA_BUILD_CONTAINER" bash -se <<'SETUP'
-          set -Eeuo pipefail
-          exec > >(tee -a /via-setup/setup.log) 2>&1
-          export DEBIAN_FRONTEND=noninteractive VIPM_NONINTERACTIVE=1 VIPM_TIMEOUT=900 NO_COLOR=1
-          export VIPM_DEBUG=1 VIPM_DESKTOP_LIVELINESS_TIMEOUT=900 VIPM_LABVIEW_LAUNCH_TIMEOUT=300
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl xvfb x11-utils
-
-          export DISPLAY=:99
-          mkdir -p /tmp/natinst
-          echo 1 > /tmp/natinst/LVContainer.txt
-          Xvfb "$DISPLAY" -screen 0 1280x720x24 -ac +extension GLX +render -noreset \
-            > /via-setup/xvfb-setup.log 2>&1 &
-          xvfb_pid=$!
-          ready=false
-          for (( attempt=0; attempt<30; attempt++ )); do
-            kill -0 "$xvfb_pid" || { echo "Xvfb exited; see xvfb-setup.log." >&2; exit 1; }
-            if xdpyinfo -display "$DISPLAY" > /dev/null 2>&1; then ready=true; break; fi
-            sleep 1
-          done
-          [[ "$ready" == true ]] || { echo "Xvfb readiness timed out." >&2; exit 1; }
-
-          installer=$(mktemp --suffix=.deb)
-          trap 'rm -f -- "$installer"' EXIT
-          curl --fail --location --retry 3 --retry-all-errors --max-time 120 \
-            https://traffic.libsyn.com/secure/jkinc/vipm_26.3.1-4025_amd64.deb \
-            --output "$installer"
-          if ! dpkg -i "$installer"; then
-            apt-get -f install -y
-            dpkg -i "$installer"
-          fi
-          rm -f -- "$installer"
-          trap - EXIT
-          command -v vipm
-          dpkg-query -W -f='${Package} ${Version}\n' vipm |
-            tee /via-setup/vipm-version.log
-
-          vipm version
-          timeout --signal=TERM --kill-after=30s 900s vipm refresh --verbose
-          [[ "$LV_YEAR" =~ ^[0-9]{4}$ ]] && (( LV_YEAR >= 2026 )) || {
-            echo "Headless execution requires LabVIEW 2026 or later." >&2; exit 1;
-          }
-          labview="/usr/local/natinst/LabVIEW-${LV_YEAR}-64/labviewprofull"
-          "$labview" --headless > /via-setup/labview-setup.log 2>&1 &
-          labview_pid=$!
-          ready=false
-          for (( attempt=0; attempt<90; attempt++ )); do
-            kill -0 "$labview_pid" || { echo "LabVIEW exited; see labview-setup.log." >&2; exit 1; }
-            if (echo > /dev/tcp/127.0.0.1/3363) 2>/dev/null; then ready=true; break; fi
-            sleep 2
-          done
-          [[ "$ready" == true ]] || { echo "LabVIEW VI Server readiness timed out." >&2; exit 1; }
-          vipm install -y astemes_lib_lunit astemes_lib_lunit_cli \
-            --labview-version "$LV_YEAR" --labview-bitness 64
-          # Diagnostic only: vipm list has crashed (SIGSEGV) after a successful install.
-          # The folder checks below decide whether LUnit was installed.
-          list_status=0
-          vipm list --installed --labview-version "$LV_YEAR" --labview-bitness 64 \
-            > /via-setup/installed-packages.log 2>&1 || list_status=$?
-          cat /via-setup/installed-packages.log
-          if (( list_status != 0 )); then
-            echo "::warning::vipm list exited with code $list_status; continuing because vipm install succeeded."
-          fi
-          vi_lib="/usr/local/natinst/LabVIEW-${LV_YEAR}-64/vi.lib/Astemes"
-          for dir in "$vi_lib/LUnit" "$vi_lib/LUnit CLI/LUnitCLI"; do
-            if [[ ! -d "$dir" ]]; then
-              echo "LUnit was not installed: missing $dir" >&2
-              exit 1
-            fi
-          done
-          # The shared action's run-via.sh starts this executable.
-          if [[ ! -x "/usr/local/natinst/LabVIEW-${LV_YEAR}-64/labview" ]]; then
-            echo "Missing /usr/local/natinst/LabVIEW-${LV_YEAR}-64/labview, which the VI Analyzer action runs." >&2
-            exit 1
-          fi
-          SETUP
-
-          # Save the container as an image. The shared action runs `docker run <image> bash -c ...`,
-          # but this base image's entrypoint is bash, which would make that `bash bash -c ...`.
-          # /usr/bin/env as the entrypoint runs whatever command the action passes.
-          docker stop "$VIA_BUILD_CONTAINER"
-          user=$(docker image inspect -f '{{.Config.User}}' "$VIA_BASE_IMAGE")
-          docker commit \
-            --change 'ENTRYPOINT ["/usr/bin/env"]' \
-            --change 'CMD ["bash"]' \
-            --change "USER ${user:-root}" \
-            "$VIA_BUILD_CONTAINER" "$VIA_IMAGE_REPO:$VIA_IMAGE_TAG"
-          docker cp "$VIA_BUILD_CONTAINER:/via-setup/." "$GITHUB_WORKSPACE/via-setup-logs"
-          docker rm "$VIA_BUILD_CONTAINER"
-          docker push "$VIA_IMAGE_REPO:$VIA_IMAGE_TAG"
-
-      - name: Upload LUnit image setup logs
-        if: failure() && env.VIA_BUILD_CREATED == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: vi-analyzer-setup-logs
-          path: via-setup-logs
-          retention-days: 7
-
       - name: Run VI Analyzer tests
-        uses: ni/open-source/via-lv-docker@actions
+        uses: ni/open-source/via-lv-docker@users/amrutha/via-lv-docker-dependencies
         with:
           config_path: ${{ github.event_name == 'workflow_dispatch' && '.github/via_config/Actor_Framework.viancfg' || '' }}
           template_path: '.github/via_config/Actor_Framework.viancfg'
           base_branch: origin/${{ github.event.pull_request.base.ref || 'main' }}
-          docker_image: ${{ env.VIA_IMAGE_REPO }}
-          labview_version: ${{ env.VIA_IMAGE_TAG }}
+          labview_version: '2026q1patch1-linux'
+          dependency_file: '.github/labview-dependencies.toml'
 
       - name: Upload VI Analyzer Report
         uses: actions/upload-artifact@v6
