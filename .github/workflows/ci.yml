@@ -168,17 +168,14 @@ jobs:
           fi
           SETUP
 
-          # Save the container as an image, restoring the base image's start-up settings
-          # (the build container overrode the entrypoint and user).
+          # Save the container as an image. The shared action runs `docker run <image> bash -c ...`,
+          # but this base image's entrypoint is bash, which would make that `bash bash -c ...`.
+          # /usr/bin/env as the entrypoint runs whatever command the action passes.
           docker stop "$VIA_BUILD_CONTAINER"
-          entrypoint=$(docker image inspect -f '{{json .Config.Entrypoint}}' "$VIA_BASE_IMAGE")
-          cmd=$(docker image inspect -f '{{json .Config.Cmd}}' "$VIA_BASE_IMAGE")
           user=$(docker image inspect -f '{{.Config.User}}' "$VIA_BASE_IMAGE")
-          [[ "$entrypoint" == null ]] && entrypoint='[]'
-          [[ "$cmd" == null ]] && cmd='[]'
           docker commit \
-            --change "ENTRYPOINT $entrypoint" \
-            --change "CMD $cmd" \
+            --change 'ENTRYPOINT ["/usr/bin/env"]' \
+            --change 'CMD ["bash"]' \
             --change "USER ${user:-root}" \
             "$VIA_BUILD_CONTAINER" "$VIA_IMAGE_REPO:$VIA_IMAGE_TAG"
           docker cp "$VIA_BUILD_CONTAINER:/via-setup/." "$GITHUB_WORKSPACE/via-setup-logs"
