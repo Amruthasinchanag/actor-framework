@@ -298,7 +298,7 @@ The CI pipeline runs **VI Analyzer (VIA)** tests on every PR to enforce code qua
 
 **How VI Analyzer runs in CI:**
 
-- VI Analyzer runs in a **Docker container** with LabVIEW 2026 Q1 Patch 1 (Linux) via the `ni/open-source/via-lv-docker` GitHub Action
+- VI Analyzer runs in a **Docker container** using the default LabVIEW image of the `ni/open-source/via-lv-docker` GitHub Action in both `ci.yml` and `run-via-tests.yml`
 - The action installs free VIPM and the packages listed in [`.github/labview-dependencies.toml`](.github/labview-dependencies.toml) in the analyzer container before analysis. This supplies LUnit and LUnit CLI without secrets or a separately prepared image.
 - CI temporarily references the action's `users/amrutha/via-lv-docker-dependencies` branch to test dependency installation; switch the reference to `@actions` after that change is merged.
 - It analyzes **only the files changed in your PR** by comparing against the PR's target branch
