@@ -42,7 +42,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run VI Analyzer tests
-        uses: ni/open-source/via-lv-docker@users/amrutha/via-lv-docker-dependencies
+        uses: ni/open-source/via-lv-docker@users/amrutha/via-lv-docker-dependency-file
         with:
           config_path: ${{ github.event_name == 'workflow_dispatch' && '.github/via_config/Actor_Framework.viancfg' || '' }}
           template_path: '.github/via_config/Actor_Framework.viancfg'
