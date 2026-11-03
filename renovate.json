@@ -1,9 +1,51 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "enabledManagers": ["github-actions"],
+  "description": [
+    "Hosted Renovate updates the VIPM manifest from the checked-in release feed; NI workflows discover versions and refresh the lock."
+  ],
+  "enabled": true,
+  "enabledManagers": ["custom.regex"],
+  "baseBranches": ["main"],
   "dependencyDashboard": true,
-  "schedule": ["before 5am on monday"],
-  "automerge": true,
-  "platformAutomerge": false
+  "cloneSubmodules": true,
+  "cloneSubmodulesFilter": ["!**"],
+  "gitIgnoredAuthors": [
+    "29139614+renovate[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
+  "prCreation": "immediate",
+  "ignoreTests": false,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": true,
+  "rebaseWhen": "behind-base-branch",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^Tooling\\/deployment\\/runner_dependencies\\.toml$/"],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "\\[dependencies\\][^\\[]*",
+        "(?:^|\\r?\\n)[ \\t]*(?<depName>[a-zA-Z0-9_]+)[ \\t]*=[ \\t]*\"(?<currentValue>\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\""
+      ],
+      "datasourceTemplate": "custom.vipm",
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\.(?<build>\\d+))?$"
+    }
+  ],
+  "customDatasources": {
+    "vipm": {
+      "defaultRegistryUrlTemplate": "file://Tooling/deployment/vipm-releases.json",
+      "format": "json",
+      "transformTemplates": ["$lookup($, '{{{packageName}}}')"]
+    }
+  },
+  "packageRules": [
+    {
+      "description": [
+        "Automerge VIPM updates only after the dependency check passes on the commit containing the refreshed lock."
+      ],
+      "matchDatasources": ["custom.vipm"],
+      "automerge": true
+    }
+  ]
 }

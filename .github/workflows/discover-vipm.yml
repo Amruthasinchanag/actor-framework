@@ -1,0 +1,93 @@
+name: Discover VIPM releases
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vipm-release-feed
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Prepare isolated discovery manifest
+        id: scratch
+        run: |
+          directory=$(mktemp -d .vipm-discovery.XXXXXX)
+          cp Tooling/deployment/runner_dependencies.toml "$directory/runner_dependencies.toml"
+          echo "directory=$directory" >> "$GITHUB_OUTPUT"
+      - name: Resolve latest versions with the NI updater
+        uses: ni/open-source/update-vipm-dependencies@8171754ea3d17f9fdcd708d8da45f96916e09c4c
+        with:
+          working_directory: ${{ steps.scratch.outputs.directory }}
+          labview_version: '2021'
+          labview_bitness: '64'
+          include_dev_dependencies: 'false'
+          vipm_serial_number: ${{ secrets.VIPM_SERIAL_NUMBER }}
+          vipm_full_name: ${{ secrets.VIPM_FULL_NAME }}
+          vipm_email: ${{ secrets.VIPM_EMAIL }}
+      - name: Export validated releases without changing production files
+        env:
+          DISCOVERY_DIRECTORY: ${{ steps.scratch.outputs.directory }}
+        run: >-
+          node scripts/vipm.mjs export-feed
+          "$DISCOVERY_DIRECTORY/runner_dependencies.toml"
+          Tooling/deployment/vipm-releases.json
+          "$DISCOVERY_DIRECTORY/runner_dependencies.lock"
+      - run: npm test
+      - name: Clean discovery worktree
+        if: always() && steps.scratch.outputs.directory != ''
+        env:
+          DISCOVERY_DIRECTORY: ${{ steps.scratch.outputs.directory }}
+        run: |
+          [[ "$DISCOVERY_DIRECTORY" == .vipm-discovery.* ]]
+          rm -rf -- "$DISCOVERY_DIRECTORY"
+      - name: Publish only the version feed through a PR
+        id: feed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          base: ${{ github.event.repository.default_branch }}
+          branch: automation/vipm-release-feed
+          add-paths: Tooling/deployment/vipm-releases.json
+          commit-message: 'chore(deps): refresh discovered VIPM releases'
+          title: 'chore(deps): refresh discovered VIPM releases'
+          body: |
+            Generated from the existing NI VIPM updater in an isolated worktree.
+            Only the version feed changes. Renovate owns production manifest updates.
+          delete-branch: true
+      - name: Dispatch feed check on the publication branch
+        if: steps.feed.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run dependency-check.yml --ref automation/vipm-release-feed -f feed_only=true
+      - name: Request policy-gated auto-merge for the feed PR
+        if: steps.feed.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.feed.outputs.pull-request-number }}
+          HEAD_SHA: ${{ steps.feed.outputs.pull-request-head-sha }}
+        run: gh pr merge "$PR_NUMBER" --auto --squash --match-head-commit "$HEAD_SHA"

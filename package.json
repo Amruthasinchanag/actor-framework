@@ -1,0 +1,19 @@
+{
+  "name": "actor-framework-vipm-dependency-check",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/vipm.mjs check"
+  },
+  "dependencies": {
+    "smol-toml": "1.9.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "jsonata": "2.2.2",
+    "yaml": "2.9.1"
+  }
+}

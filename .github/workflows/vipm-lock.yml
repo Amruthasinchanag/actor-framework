@@ -1,0 +1,54 @@
+name: Refresh VIPM lock for Renovate
+
+on:
+  pull_request:
+    paths:
+      - Tooling/deployment/runner_dependencies.toml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vipm-lock-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock:
+    name: vipm-lock
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      startsWith(github.head_ref, 'renovate/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Regenerate runner dependency lock with NI
+        uses: ni/open-source/refresh-vipm-lock@8171754ea3d17f9fdcd708d8da45f96916e09c4c
+        with:
+          working_directory: Tooling/deployment
+          labview_version: '2021'
+          labview_bitness: '64'
+          vipm_serial_number: ${{ secrets.VIPM_SERIAL_NUMBER }}
+          vipm_full_name: ${{ secrets.VIPM_FULL_NAME }}
+          vipm_email: ${{ secrets.VIPM_EMAIL }}
+      - name: Commit lock and run dependency check on final commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if [ -z "$(git status --porcelain -- Tooling/deployment/runner_dependencies.lock)" ]; then
+            echo "runner_dependencies.lock is already current"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add Tooling/deployment/runner_dependencies.lock
+            git commit -m 'chore(deps): regenerate VIPM lock'
+            git push origin "HEAD:$BRANCH"
+          fi
+          gh workflow run dependency-check.yml --ref "$BRANCH"
