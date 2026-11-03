@@ -25,17 +25,6 @@ on:
 jobs:
   run-unit-tests:
     name: Run unit tests
-    runs-on: [self-hosted, iconeditor]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Run unit tests
-        shell: pwsh
-        working-directory: pipeline/scripts
-
-        run: |
-          $repoRoot = $env:GITHUB_WORKSPACE
-          $scriptsFolder = Join-Path $repoRoot 'pipeline/scripts'
-          .\unit_tests.ps1 -RelativePath $repoRoot -AbsolutePathScripts $scriptsFolder
+    permissions:
+      contents: read
+    uses: ./.github/workflows/lunit-container-tests.yml
