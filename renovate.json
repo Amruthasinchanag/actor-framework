@@ -4,5 +4,6 @@
   "enabledManagers": ["github-actions"],
   "dependencyDashboard": true,
   "schedule": ["before 5am on monday"],
-  "automerge": false
+  "automerge": true,
+  "platformAutomerge": false
 }
