@@ -85,15 +85,15 @@ export function exportFeed(baseline, resolved, previous = {}) {
 }
 
 async function main() {
-  const [command, manifest = defaultManifest, source = defaultFeed, lockPath = defaultLock] = process.argv.slice(2);
-  assert.ok(['check', 'export-feed'].includes(command), 'Usage: node scripts/vipm.mjs <check|export-feed> [manifest] [feed] [lock]');
+  const [command, manifest = defaultManifest, source = defaultFeed, lockPath = defaultLock, baselinePath = defaultManifest] = process.argv.slice(2);
+  assert.ok(['check', 'export-feed'].includes(command), 'Usage: node scripts/vipm.mjs <check|export-feed> [manifest] [feed] [lock] [baseline]');
   const text = await readFile(manifest, 'utf8');
   const feedText = await readFile(source, 'utf8');
   const feed = JSON.parse(feedText);
   if (command === 'export-feed') {
     const resolved = parse(text);
     checkLock(resolved, parse(await readFile(lockPath, 'utf8')));
-    const baseline = parse(await readFile(defaultManifest, 'utf8'));
+    const baseline = parse(await readFile(baselinePath, 'utf8'));
     const updated = `${JSON.stringify(exportFeed(baseline, resolved, feed), null, 2)}\n`;
     if (updated !== feedText) await writeFile(source, updated);
     console.log(`Exported VIPM releases to ${source}`);

@@ -32,6 +32,8 @@ jobs:
         uses: ni/open-source/refresh-vipm-lock@8171754ea3d17f9fdcd708d8da45f96916e09c4c
         with:
           working_directory: Tooling/deployment
+          manifest_filename: runner_dependencies.toml
+          lock_filename: runner_dependencies.lock
           labview_version: '2021'
           labview_bitness: '64'
           vipm_serial_number: ${{ secrets.VIPM_SERIAL_NUMBER }}

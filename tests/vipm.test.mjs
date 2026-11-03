@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import jsonata from 'jsonata';
 import { parse as parseToml } from 'smol-toml';
@@ -68,6 +72,9 @@ test('the lock workflow is restricted to same-repository Renovate pull requests'
   assert.ok(workflow.jobs.lock.if.includes("github.event.pull_request.user.login == 'renovate[bot]'"));
   assert.ok(workflow.jobs.lock.if.includes('github.event.pull_request.head.repo.full_name == github.repository'));
   assert.ok(workflow.jobs.lock.steps.at(-1).run.includes('workflow run dependency-check.yml'));
+  const refresh = workflow.jobs.lock.steps.find(step => step.uses?.startsWith('ni/open-source/refresh-vipm-lock@'));
+  assert.equal(refresh.with.manifest_filename, 'runner_dependencies.toml');
+  assert.equal(refresh.with.lock_filename, 'runner_dependencies.lock');
 });
 
 test('scheduled NI discovery publishes only its isolated version feed', async () => {
@@ -77,6 +84,9 @@ test('scheduled NI discovery publishes only its isolated version feed', async ()
   assert.ok(!Object.hasOwn(workflow.on, 'pull_request'));
   const steps = workflow.jobs.discover.steps;
   assert.ok(steps.some(step => step.uses === 'ni/open-source/update-vipm-dependencies@8171754ea3d17f9fdcd708d8da45f96916e09c4c'));
+  const updater = steps.find(step => step.uses?.startsWith('ni/open-source/update-vipm-dependencies@'));
+  assert.equal(updater.with.manifest_filename, '${{ env.MANIFEST_FILENAME }}');
+  assert.equal(updater.with.lock_filename, '${{ env.LOCK_FILENAME }}');
   const publication = steps.find(step => step.id === 'feed');
   assert.equal(publication.with['add-paths'], 'Tooling/deployment/vipm-releases.json');
   assert.equal(publication.with.branch, 'automation/vipm-release-feed');
@@ -92,4 +102,20 @@ test('dependency-check is one hosted job and requires the lock on Renovate PRs',
   assert.deepEqual(config.baseBranches, ['main']);
   assert.equal(config.platformAutomerge, true);
   assert.equal(config.packageRules[0].automerge, true);
+});
+
+test('export CLI accepts custom manifest, lock, and baseline paths without vipm.toml', async context => {
+  const directory = await mkdtemp(join(tmpdir(), 'af-custom-vipm-'));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const baseline = '[project]\nlabview-version = 2021\n[dependencies]\ndemo_package = "1.0.0.1"\n';
+  await writeFile(join(directory, 'requirements.toml'), baseline);
+  await writeFile(join(directory, 'resolved.toml'), baseline.replace('1.0.0.1', '1.0.0.10'));
+  await writeFile(join(directory, 'requirements.lock'), '[[package]]\nname = "demo_package"\nversion = "1.0.0.10"\n');
+  await writeFile(join(directory, 'releases.json'), JSON.stringify(sampleFeed));
+  const script = fileURLToPath(new URL('../scripts/vipm.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [script, 'export-feed', 'resolved.toml', 'releases.json', 'requirements.lock', 'requirements.toml'], { cwd: directory, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(await readFile(join(directory, 'requirements.toml'), 'utf8'), baseline);
+  const exported = JSON.parse(await readFile(join(directory, 'releases.json'), 'utf8'));
+  assert.equal(exported.demo_package.releases.at(-1).version, '1.0.0.10');
 });

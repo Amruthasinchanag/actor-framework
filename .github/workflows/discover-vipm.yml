@@ -4,6 +4,24 @@ on:
   schedule:
     - cron: '17 6 * * *'
   workflow_dispatch:
+    inputs:
+      working_directory:
+        description: Directory containing the production VIPM manifest
+        type: string
+        default: Tooling/deployment
+      manifest_filename:
+        description: VIPM manifest filename within that directory
+        type: string
+        default: runner_dependencies.toml
+      lock_filename:
+        description: Generated VIPM lock filename
+        type: string
+        default: runner_dependencies.lock
+
+env:
+  WORKING_DIRECTORY: ${{ inputs.working_directory || 'Tooling/deployment' }}
+  MANIFEST_FILENAME: ${{ inputs.manifest_filename || 'runner_dependencies.toml' }}
+  LOCK_FILENAME: ${{ inputs.lock_filename || 'runner_dependencies.lock' }}
 
 permissions:
   contents: read
@@ -34,13 +52,17 @@ jobs:
       - name: Prepare isolated discovery manifest
         id: scratch
         run: |
+          [[ "$MANIFEST_FILENAME" =~ ^[a-zA-Z0-9_.-]+$ && "$MANIFEST_FILENAME" != '.' && "$MANIFEST_FILENAME" != '..' ]]
+          [[ "$LOCK_FILENAME" =~ ^[a-zA-Z0-9_.-]+$ && "$LOCK_FILENAME" != '.' && "$LOCK_FILENAME" != '..' ]]
           directory=$(mktemp -d .vipm-discovery.XXXXXX)
-          cp Tooling/deployment/runner_dependencies.toml "$directory/runner_dependencies.toml"
+          cp -- "$WORKING_DIRECTORY/$MANIFEST_FILENAME" "$directory/$MANIFEST_FILENAME"
           echo "directory=$directory" >> "$GITHUB_OUTPUT"
       - name: Resolve latest versions with the NI updater
         uses: ni/open-source/update-vipm-dependencies@8171754ea3d17f9fdcd708d8da45f96916e09c4c
         with:
           working_directory: ${{ steps.scratch.outputs.directory }}
+          manifest_filename: ${{ env.MANIFEST_FILENAME }}
+          lock_filename: ${{ env.LOCK_FILENAME }}
           labview_version: '2021'
           labview_bitness: '64'
           include_dev_dependencies: 'false'
@@ -52,9 +74,10 @@ jobs:
           DISCOVERY_DIRECTORY: ${{ steps.scratch.outputs.directory }}
         run: >-
           node scripts/vipm.mjs export-feed
-          "$DISCOVERY_DIRECTORY/runner_dependencies.toml"
+          "$DISCOVERY_DIRECTORY/$MANIFEST_FILENAME"
           Tooling/deployment/vipm-releases.json
-          "$DISCOVERY_DIRECTORY/runner_dependencies.lock"
+          "$DISCOVERY_DIRECTORY/$LOCK_FILENAME"
+          "$WORKING_DIRECTORY/$MANIFEST_FILENAME"
       - run: npm test
       - name: Clean discovery worktree
         if: always() && steps.scratch.outputs.directory != ''
