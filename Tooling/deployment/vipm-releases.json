@@ -1,26 +1,73 @@
 {
   "jdp_science_jsontext": {
-    "releases": [{ "version": "1.9.0.124" }]
+    "releases": [
+      {
+        "version": "1.9.0.124"
+      },
+      {
+        "version": "1.9.1.125"
+      }
+    ]
   },
   "jdp_science_lib_common_utilities": {
-    "releases": [{ "version": "1.4.1.18" }]
+    "releases": [
+      {
+        "version": "1.4.1.18"
+      },
+      {
+        "version": "1.4.2.19"
+      }
+    ]
   },
   "jki_lib_caraya": {
-    "releases": [{ "version": "1.4.3.147" }]
+    "releases": [
+      {
+        "version": "1.4.3.147"
+      },
+      {
+        "version": "1.4.4.148"
+      }
+    ]
   },
   "jki_lib_state_machine": {
-    "releases": [{ "version": "2024.0.3.23" }]
+    "releases": [
+      {
+        "version": "2024.0.3.23"
+      }
+    ]
   },
   "jki_lib_vipm_api": {
-    "releases": [{ "version": "2020.0.3.80" }]
+    "releases": [
+      {
+        "version": "2020.0.3.80"
+      }
+    ]
   },
   "sas_workshops_lib_lvbuildspec_for_g_cli": {
-    "releases": [{ "version": "1.2.0.99" }]
+    "releases": [
+      {
+        "version": "1.2.0.99"
+      },
+      {
+        "version": "1.2.1.104"
+      }
+    ]
   },
   "sas_workshops_lib_vipb_builder_for_g_cli": {
-    "releases": [{ "version": "1.1.5.42" }]
+    "releases": [
+      {
+        "version": "1.1.5.42"
+      },
+      {
+        "version": "1.1.6.46"
+      }
+    ]
   },
   "wiresmith_technology_lib_g_cli": {
-    "releases": [{ "version": "3.0.1.98" }]
+    "releases": [
+      {
+        "version": "3.0.1.98"
+      }
+    ]
   }
 }
