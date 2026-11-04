@@ -37,18 +37,22 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
-      pull-requests: write
-      actions: write
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Load the previously published release feed
+        env:
+          FEED_BRANCH: automation/vipm-release-feed
+        run: |
+          if git fetch origin "refs/heads/$FEED_BRANCH:refs/remotes/origin/$FEED_BRANCH"; then
+            git show "origin/$FEED_BRANCH:Tooling/deployment/vipm-releases.json" > Tooling/deployment/vipm-releases.json
+          fi
       - name: Prepare isolated discovery manifest
         id: scratch
         run: |
@@ -86,31 +90,24 @@ jobs:
         run: |
           [[ "$DISCOVERY_DIRECTORY" == .vipm-discovery.* ]]
           rm -rf -- "$DISCOVERY_DIRECTORY"
-      - name: Publish only the version feed through a PR
-        id: feed
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ github.token }}
-          base: ${{ github.event.repository.default_branch }}
-          branch: automation/vipm-release-feed
-          add-paths: Tooling/deployment/vipm-releases.json
-          commit-message: 'chore(deps): refresh discovered VIPM releases'
-          title: 'chore(deps): refresh discovered VIPM releases'
-          body: |
-            Generated from the existing NI VIPM updater in an isolated worktree.
-            Only the version feed changes. Renovate owns production manifest updates.
-          delete-branch: true
-      - name: Dispatch feed check on the publication branch
-        if: steps.feed.outputs.pull-request-number != ''
+      - name: Save the generated feed for publication
+        run: cp -- Tooling/deployment/vipm-releases.json "$RUNNER_TEMP/vipm-releases.json"
+      - name: Publish the feed on its read-only Renovate datasource branch
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: gh workflow run dependency-check.yml --ref automation/vipm-release-feed -f feed_only=true
-      - name: Request policy-gated auto-merge for the feed PR
-        if: steps.feed.outputs.pull-request-number != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.feed.outputs.pull-request-number }}
-          HEAD_SHA: ${{ steps.feed.outputs.pull-request-head-sha }}
-        run: gh pr merge "$PR_NUMBER" --auto --squash --match-head-commit "$HEAD_SHA"
+          FEED_BRANCH: automation/vipm-release-feed
+        run: |
+          if git show-ref --verify --quiet "refs/remotes/origin/$FEED_BRANCH"; then
+            git checkout --force -B "$FEED_BRANCH" "refs/remotes/origin/$FEED_BRANCH"
+          else
+            git checkout -b "$FEED_BRANCH"
+          fi
+          cp -- "$RUNNER_TEMP/vipm-releases.json" Tooling/deployment/vipm-releases.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Tooling/deployment/vipm-releases.json
+          if git diff --cached --quiet; then
+            echo 'Release feed is unchanged'
+            exit 0
+          fi
+          git commit -m 'chore(deps): refresh discovered VIPM releases'
+          git push origin "HEAD:refs/heads/$FEED_BRANCH"

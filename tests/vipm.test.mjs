@@ -58,8 +58,8 @@ test('Renovate extracts only numeric dependencies from the production manifest a
   const extracted = [...section.matchAll(new RegExp(manager.matchStrings[1], 'g'))].map(match => [match.groups.depName, match.groups.currentValue]);
   const expected = Object.entries(parseToml(text).dependencies).filter(([, version]) => isSupportedVersion(version));
   assert.deepEqual(extracted.sort(), expected.sort());
-  const feedPath = config.customDatasources.vipm.defaultRegistryUrlTemplate.slice('file://'.length);
-  const feed = JSON.parse(await readFile(new URL(`../${feedPath}`, import.meta.url), 'utf8'));
+  assert.equal(config.customDatasources.vipm.defaultRegistryUrlTemplate, 'https://raw.githubusercontent.com/Amruthasinchanag/actor-framework/automation/vipm-release-feed/Tooling/deployment/vipm-releases.json');
+  const feed = JSON.parse(await readFile(new URL('../Tooling/deployment/vipm-releases.json', import.meta.url), 'utf8'));
   for (const [packageName, versions] of Object.entries(feed)) {
     const expression = config.customDatasources.vipm.transformTemplates[0].replace('{{{packageName}}}', packageName);
     assert.deepEqual(await jsonata(expression).evaluate(feed), versions);
@@ -77,7 +77,7 @@ test('the lock workflow is restricted to same-repository Renovate pull requests'
   assert.equal(refresh.with.lock_filename, 'runner_dependencies.lock');
 });
 
-test('scheduled NI discovery publishes only its isolated version feed', async () => {
+test('scheduled NI discovery publishes only its version feed without creating a PR', async () => {
   const workflow = parseYaml(await readFile(new URL('../.github/workflows/discover-vipm.yml', import.meta.url), 'utf8'));
   assert.ok(workflow.on.schedule.length > 0);
   assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
@@ -87,9 +87,11 @@ test('scheduled NI discovery publishes only its isolated version feed', async ()
   const updater = steps.find(step => step.uses?.startsWith('ni/open-source/update-vipm-dependencies@'));
   assert.equal(updater.with.manifest_filename, '${{ env.MANIFEST_FILENAME }}');
   assert.equal(updater.with.lock_filename, '${{ env.LOCK_FILENAME }}');
-  const publication = steps.find(step => step.id === 'feed');
-  assert.equal(publication.with['add-paths'], 'Tooling/deployment/vipm-releases.json');
-  assert.equal(publication.with.branch, 'automation/vipm-release-feed');
+  assert.equal(workflow.jobs.discover.permissions.contents, 'write');
+  assert.equal(Object.hasOwn(workflow.jobs.discover.permissions, 'pull-requests'), false);
+  const publication = steps.find(step => step.name === 'Publish the feed on its read-only Renovate datasource branch');
+  assert.ok(publication.run.includes('git push origin "HEAD:refs/heads/$FEED_BRANCH"'));
+  assert.ok(!steps.some(step => step.uses?.startsWith('peter-evans/create-pull-request@')));
 });
 
 test('dependency-check is one hosted job and requires the lock on Renovate PRs', async () => {

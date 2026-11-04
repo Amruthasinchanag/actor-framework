@@ -34,7 +34,7 @@
   ],
   "customDatasources": {
     "vipm": {
-      "defaultRegistryUrlTemplate": "file://Tooling/deployment/vipm-releases.json",
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/Amruthasinchanag/actor-framework/automation/vipm-release-feed/Tooling/deployment/vipm-releases.json",
       "format": "json",
       "transformTemplates": ["$lookup($, '{{{packageName}}}')"]
     }
